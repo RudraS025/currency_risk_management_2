@@ -5,6 +5,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { Calendar, TrendingUp, TrendingDown, Calculator, Download } from 'lucide-react'
 import { useCurrency } from '@/contexts/CurrencyContext'
 import { format, differenceInDays, addDays } from 'date-fns'
+import { INTEREST_RATES } from '@/lib/enhanced-financial-utils'
 
 // Cubic Spline Interpolation Implementation
 class CubicSpline {
@@ -132,10 +133,18 @@ export default function PnLAnalytics() {
     const contract = state.contracts.find(c => c.id === selectedContractId)
     if (!contract) return []
 
+    // Get the correct spot rate for the contract's currency pair
+    const rateInfo = state.currencyRates.find(r => r.pair === contract.currencyPair)
+    if (!rateInfo) {
+      console.warn(`No live rate found for ${contract.currencyPair}`)
+      return []
+    }
+
     const contractDays = differenceInDays(contract.maturityDate, contract.contractDate)
-    const spotRate = 85.40 // This would come from live data
-    const homeRate = 6.50 // INR rate
-    const foreignRate = 5.25 // USD rate
+    const spotRate = rateInfo.spotRate
+    const [baseCurrency, quoteCurrency] = contract.currencyPair.split('/')
+    const homeRate = INTEREST_RATES[quoteCurrency as keyof typeof INTEREST_RATES] || 0.055
+    const foreignRate = INTEREST_RATES[baseCurrency as keyof typeof INTEREST_RATES] || 0.05
 
     // Generate forward curve using cubic spline
     const forwardCurve = calculateForwardCurve(spotRate, homeRate, foreignRate, contractDays)
@@ -160,28 +169,69 @@ export default function PnLAnalytics() {
 
   const selectedContract = state.contracts.find(c => c.id === selectedContractId)
 
-  // Calculate summary statistics
+  // Calculate summary statistics with proper risk metrics
   const summary = useMemo(() => {
     if (pnlData.length === 0) return null
 
+    const contract = selectedContract
+    if (!contract) return null
+
     const totalPnl = pnlData[pnlData.length - 1]?.pnl || 0
     const maxProfit = Math.max(...pnlData.map(d => d.pnl))
-    const maxLoss = Math.min(...pnlData.map(d => d.pnl))
-    const volatility = pnlData.length > 1 ? 
-      Math.sqrt(pnlData.reduce((sum, d, i) => {
-        if (i === 0) return 0
-        const change = (d.forwardRate - pnlData[i-1].forwardRate) / pnlData[i-1].forwardRate
-        return sum + Math.pow(change, 2)
-      }, 0) / (pnlData.length - 1)) * Math.sqrt(365) * 100 : 0
+    
+    // CORRECTED: Calculate Max Loss using VaR-based approach (99% confidence)
+    // For forward contracts, max loss is based on extreme adverse movements
+    const budgetedRate = contract.budgetedForwardRate
+    const contractAmount = contract.amount
+    const daysToMaturity = Math.max(1, differenceInDays(new Date(contract.maturityDate), new Date()))
+    
+    // Calculate volatility properly (annualized)
+    const dailyReturns = pnlData.slice(1).map((d, i) => 
+      (d.forwardRate - pnlData[i].forwardRate) / pnlData[i].forwardRate
+    )
+    const volatility = dailyReturns.length > 1 ? 
+      Math.sqrt(dailyReturns.reduce((sum, r) => sum + Math.pow(r, 2), 0) / dailyReturns.length) * Math.sqrt(365) * 100 : 15
+    
+    // VaR-based Max Loss calculation (99% confidence level)
+    // Assumes normal distribution, 2.33 is 99% confidence z-score
+    const timeToMaturityYears = daysToMaturity / 365
+    const maxAdverseMovement = 2.33 * (volatility / 100) * Math.sqrt(timeToMaturityYears)
+    
+    // For EUR/INR export contract, max loss occurs when EUR weakens
+    const worstCaseForwardRate = budgetedRate * (1 - maxAdverseMovement)
+    const maxLoss = Math.abs((worstCaseForwardRate - budgetedRate) * contractAmount)
+    
+    // CORRECTED: Calculate Optimal Exit Day properly
+    // Find the day with best risk-adjusted return (within maturity period)
+    let optimalExitDay = 0
+    let bestRiskAdjustedReturn = -Infinity
+    
+    pnlData.forEach((d, index) => {
+      if (index < daysToMaturity) { // Ensure within maturity period
+        const pnl = d.pnl
+        const timeRemaining = daysToMaturity - index
+        const riskAdjustedReturn = timeRemaining > 0 ? pnl / Math.sqrt(timeRemaining) : pnl
+        
+        if (riskAdjustedReturn > bestRiskAdjustedReturn) {
+          bestRiskAdjustedReturn = riskAdjustedReturn
+          optimalExitDay = index
+        }
+      }
+    })
+    
+    // Ensure optimal exit is within valid range
+    optimalExitDay = Math.min(optimalExitDay, daysToMaturity - 1)
 
     return {
       totalPnl,
       maxProfit,
       maxLoss,
       volatility,
-      optimalExitDay: pnlData.findIndex(d => d.pnl === maxProfit),
+      optimalExitDay,
+      daysToMaturity,
+      riskAdjustedReturn: bestRiskAdjustedReturn
     }
-  }, [pnlData])
+  }, [pnlData, selectedContract])
 
   return (
     <div className="space-y-6">

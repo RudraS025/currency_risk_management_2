@@ -13,7 +13,7 @@ const INTEREST_RATES = {
   CAD: 0.0475, // 4.75% BoC Rate
   CHF: 0.0175, // 1.75% SNB Rate
   CNY: 0.0320, // 3.20% PBoC Rate
-  INR: 0.0650  // 6.50% RBI Repo Rate
+  INR: 0.0550  // 5.50% RBI Repo Rate (CORRECTED from 6.50%)
 }
 
 function calculateBudgetedForwardRate(inceptionSpotRate, currencyPair, contractMaturityDays) {

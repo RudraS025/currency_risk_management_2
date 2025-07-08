@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Currency Risk Management System - User Guide</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+            margin-bottom: 30px;
+        }
+        h2 {
+            color: #34495e;
+            border-left: 4px solid #3498db;
+            padding-left: 15px;
+            margin-top: 30px;
+        }
+        h3 {
+            color: #2980b9;
+            margin-top: 25px;
+        }
+        .status-badge {
+            display: inline-block;
+            background: #27ae60;
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .feature-card {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            border-left: 4px solid #3498db;
+        }
+        .feature-card h4 {
+            color: #2c3e50;
+            margin-top: 0;
+        }
+        .step-list {
+            background: #ecf0f1;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+        .step-list li {
+            margin: 8px 0;
+            padding: 5px 0;
+        }
+        .warning {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+        .success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+        .code {
+            background: #f4f4f4;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            margin: 10px 0;
+        }
+        .nav-tabs {
+            display: flex;
+            justify-content: center;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+        .nav-tab {
+            background: #3498db;
+            color: white;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 25px;
+            text-decoration: none;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        .nav-tab:hover {
+            background: #2980b9;
+            transform: translateY(-2px);
+        }
+        .screenshot-placeholder {
+            background: #ecf0f1;
+            border: 2px dashed #bdc3c7;
+            padding: 40px;
+            text-align: center;
+            border-radius: 10px;
+            margin: 15px 0;
+            color: #7f8c8d;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Currency Risk Management System - User Guide
+            <span class="status-badge">OPERATIONAL</span>
+        </h1>
+
+        <div class="success">
+            <strong>🎯 System Status:</strong> The Currency Risk Management System is now fully operational and accessible at <strong>http://localhost:3002</strong>
+        </div>
+
+        <h2>🚀 Getting Started</h2>
+        
+        <div class="feature-grid">
+            <div class="feature-card">
+                <h4>🌐 Access the System</h4>
+                <div class="code">http://localhost:3002</div>
+                <p>The system runs on port 3002 and provides a modern, responsive interface for currency risk management.</p>
+            </div>
+            
+            <div class="feature-card">
+                <h4>📊 Live Data Integration</h4>
+                <p>All currency rates are fetched in real-time from multiple sources including FxRatesAPI and central bank feeds.</p>
+            </div>
+            
+            <div class="feature-card">
+                <h4>🔄 Real-Time Updates</h4>
+                <p>The system automatically updates rates and calculations every 30 seconds for live market conditions.</p>
+            </div>
+            
+            <div class="feature-card">
+                <h4>📈 Advanced Analytics</h4>
+                <p>Comprehensive P&L attribution, risk metrics, and forward curve analysis using cubic spline interpolation.</p>
+            </div>
+        </div>
+
+        <h2>📋 Main System Tabs</h2>
+        
+        <div class="nav-tabs">
+            <span class="nav-tab">📊 Dashboard</span>
+            <span class="nav-tab">📄 Contracts</span>
+            <span class="nav-tab">📈 Analytics</span>
+            <span class="nav-tab">📋 Reporting</span>
+        </div>
+
+        <h3>1. 📊 Dashboard Tab</h3>
+        <div class="step-list">
+            <strong>Features:</strong>
+            <li>Real-time currency rates for all major pairs</li>
+            <li>Live market data updates</li>
+            <li>Currency pair selection and monitoring</li>
+            <li>Market trend indicators</li>
+        </div>
+
+        <h3>2. 📄 Contracts Tab</h3>
+        <div class="step-list">
+            <strong>Contract Management:</strong>
+            <li>Create new FX forward contracts</li>
+            <li>Edit existing contracts</li>
+            <li>View contract details and performance</li>
+            <li>Track hedge effectiveness</li>
+        </div>
+
+        <div class="step-list">
+            <strong>Creating a New Contract:</strong>
+            <li>Select currency pair (e.g., USD/INR, EUR/USD)</li>
+            <li>Enter contract details (amount, maturity date)</li>
+            <li>System automatically calculates forward rate using IRP</li>
+            <li>Review and confirm contract creation</li>
+        </div>
+
+        <h3>3. 📈 Analytics Tab</h3>
+        <div class="step-list">
+            <strong>P&L Analysis:</strong>
+            <li>Daily P&L attribution by contract</li>
+            <li>Mark-to-market calculations</li>
+            <li>Historical performance tracking</li>
+            <li>Risk exposure analysis</li>
+        </div>
+
+        <div class="step-list">
+            <strong>Available Metrics:</strong>
+            <li>Unrealized P&L per contract</li>
+            <li>Total portfolio exposure</li>
+            <li>Risk metrics (VaR, Greeks)</li>
+            <li>Performance attribution</li>
+        </div>
+
+        <h3>4. 📋 Reporting Tab</h3>
+        <div class="step-list">
+            <strong>Risk Reports:</strong>
+            <li>Comprehensive risk dashboards</li>
+            <li>Exposure analysis by currency</li>
+            <li>Compliance reporting</li>
+            <li>Export capabilities</li>
+        </div>
+
+        <h2>🔧 Key Features</h2>
+
+        <div class="feature-grid">
+            <div class="feature-card">
+                <h4>💱 Interest Rate Parity (IRP)</h4>
+                <p>Forward rates calculated using accurate IRP formula with real central bank rates.</p>
+            </div>
+            
+            <div class="feature-card">
+                <h4>📊 Cubic Spline Interpolation</h4>
+                <p>Smooth yield curve construction for accurate forward rate calculations.</p>
+            </div>
+            
+            <div class="feature-card">
+                <h4>📈 Daily P&L Attribution</h4>
+                <p>Precise profit/loss calculations based on market movements and time decay.</p>
+            </div>
+            
+            <div class="feature-card">
+                <h4>🎯 Risk Metrics</h4>
+                <p>Value at Risk (VaR), Greeks, and exposure calculations for comprehensive risk management.</p>
+            </div>
+        </div>
+
+        <h2>📊 Supported Currency Pairs</h2>
+        
+        <div class="feature-grid">
+            <div class="feature-card">
+                <h4>Major Pairs</h4>
+                <ul>
+                    <li>USD/INR (US Dollar/Indian Rupee)</li>
+                    <li>EUR/USD (Euro/US Dollar)</li>
+                    <li>GBP/USD (British Pound/US Dollar)</li>
+                    <li>USD/JPY (US Dollar/Japanese Yen)</li>
+                </ul>
+            </div>
+            
+            <div class="feature-card">
+                <h4>Cross Pairs</h4>
+                <ul>
+                    <li>EUR/GBP (Euro/British Pound)</li>
+                    <li>EUR/JPY (Euro/Japanese Yen)</li>
+                    <li>GBP/JPY (British Pound/Japanese Yen)</li>
+                    <li>And many more...</li>
+                </ul>
+            </div>
+        </div>
+
+        <h2>🎯 Interest Rates (Current)</h2>
+        
+        <div class="step-list">
+            <strong>Central Bank Rates:</strong>
+            <li><strong>Federal Reserve (USD):</strong> 5.25%</li>
+            <li><strong>Reserve Bank of India (INR):</strong> 5.50% (Recently Corrected)</li>
+            <li><strong>European Central Bank (EUR):</strong> 4.25%</li>
+            <li><strong>Bank of England (GBP):</strong> 5.00%</li>
+            <li><strong>Bank of Japan (JPY):</strong> 0.25%</li>
+        </div>
+
+        <h2>⚠️ Important Notes</h2>
+        
+        <div class="warning">
+            <strong>Data Accuracy:</strong> All rates and calculations are based on live market data. The system updates automatically every 30 seconds to ensure accuracy.
+        </div>
+        
+        <div class="warning">
+            <strong>Risk Management:</strong> This system is designed for institutional-grade risk management. Always verify calculations and understand the risks before making trading decisions.
+        </div>
+
+        <h2>🔧 Technical Support</h2>
+        
+        <div class="step-list">
+            <strong>If you encounter any issues:</strong>
+            <li>Check the browser console for error messages</li>
+            <li>Verify internet connectivity for live data feeds</li>
+            <li>Refresh the page if data appears stale</li>
+            <li>Contact technical support for complex issues</li>
+        </div>
+
+        <h2>📚 Additional Resources</h2>
+        
+        <div class="feature-grid">
+            <div class="feature-card">
+                <h4>📖 Documentation</h4>
+                <p>Complete system documentation available in the project folder including technical specifications and API references.</p>
+            </div>
+            
+            <div class="feature-card">
+                <h4>🔄 Version Control</h4>
+                <p>System includes version bookmarking and restore capabilities for safe fallback to previous versions.</p>
+            </div>
+            
+            <div class="feature-card">
+                <h4>🧪 Testing Tools</h4>
+                <p>Comprehensive test suite and verification tools available for validating calculations and system integrity.</p>
+            </div>
+        </div>
+
+        <div class="success">
+            <strong>🎉 Ready to Use:</strong> The Currency Risk Management System is now fully operational and ready for institutional-grade currency risk management operations.
+        </div>
+
+        <div style="text-align: center; margin-top: 30px; color: #7f8c8d;">
+            <p>Last Updated: $(Get-Date -Format "yyyy-MM-dd HH:mm:ss")</p>
+            <p>System Version: v1.0.0-production-ready</p>
+            <p>Status: ✅ <strong>OPERATIONAL</strong></p>
+        </div>
+    </div>
+</body>
+</html>

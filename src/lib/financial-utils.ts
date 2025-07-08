@@ -384,11 +384,11 @@ export function getInterestRates(currencyPair: string): { foreign: number; domes
     CAD: 0.0475, // 4.75%
     CHF: 0.0175, // 1.75%
     CNY: 0.032,  // 3.20%
-    INR: 0.065   // 6.50%
+    INR: 0.055   // 5.50% RBI Repo Rate (CORRECTED from 6.50%)
   }
   
   return {
     foreign: rates[currency] || 0.05,
-    domestic: rates['INR'] || 0.065
+    domestic: rates['INR'] || 0.055  // Updated to 5.50%
   }
 }

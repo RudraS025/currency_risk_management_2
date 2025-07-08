@@ -6,7 +6,7 @@
 // Current market interest rates (annual) - July 2025
 const INTEREST_RATES = {
   USD: 0.0450, // 4.50% Fed Funds
-  INR: 0.0650  // 6.50% RBI Repo Rate
+  INR: 0.0550  // 5.50% RBI Repo Rate (CORRECTED from 6.50%)
 };
 
 console.log('=== FORWARD RATE CALCULATION EXPLANATION ===');
@@ -32,7 +32,7 @@ console.log();
 
 const t = daysToMaturity / 365; // Time in years
 const r_foreign_USD = INTEREST_RATES.USD; // 4.50%
-const r_domestic_INR = INTEREST_RATES.INR; // 6.50%
+const r_domestic_INR = INTEREST_RATES.INR; // 5.50% (CORRECTED)
 
 console.log('   Interest Rate Differential:');
 console.log(`   - USD (Foreign): ${r_foreign_USD * 100}%`);

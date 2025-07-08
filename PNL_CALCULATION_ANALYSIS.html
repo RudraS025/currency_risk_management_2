@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EUR/INR Contract P&L Analysis - Detailed Calculation Verification</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            border-bottom: 3px solid #e74c3c;
+            padding-bottom: 10px;
+            margin-bottom: 30px;
+        }
+        h2 {
+            color: #34495e;
+            border-left: 4px solid #e74c3c;
+            padding-left: 15px;
+            margin-top: 30px;
+        }
+        .contract-info {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            border-left: 4px solid #3498db;
+        }
+        .calculation-box {
+            background: #e8f5e8;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            border-left: 4px solid #27ae60;
+        }
+        .error-box {
+            background: #fff5f5;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            border-left: 4px solid #e74c3c;
+        }
+        .formula {
+            background: #f4f4f4;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            margin: 10px 0;
+        }
+        .step {
+            margin: 15px 0;
+            padding: 10px;
+            background: #ecf0f1;
+            border-radius: 5px;
+        }
+        .result {
+            background: #d4edda;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            font-weight: bold;
+        }
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        .table th, .table td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        .table th {
+            background: #f8f9fa;
+            font-weight: bold;
+        }
+        .highlight {
+            background: #fff3cd;
+            padding: 10px;
+            border-radius: 5px;
+            border-left: 4px solid #ffc107;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>EUR/INR Contract P&L Analysis</h1>
+        <h2>Detailed Calculation Verification</h2>
+
+        <div class="contract-info">
+            <h3>📋 Contract Details</h3>
+            <ul>
+                <li><strong>Currency Pair:</strong> EUR/INR</li>
+                <li><strong>Contract Type:</strong> Export</li>
+                <li><strong>Amount:</strong> $5,00,000 (5 lakhs USD)</li>
+                <li><strong>Budgeted Forward Rate:</strong> 99.6775 INR/EUR</li>
+                <li><strong>Days to Maturity:</strong> 83 days</li>
+                <li><strong>Current P&L:</strong> +₹3,94,743.387</li>
+            </ul>
+        </div>
+
+        <h2>🔍 Analysis of Max Loss Calculation</h2>
+
+        <div class="error-box">
+            <h3>⚠️ POTENTIAL ISSUE IDENTIFIED</h3>
+            <p>The reported Max Loss of <strong>₹3,90,871.083</strong> appears to be incorrect based on the current P&L calculation methodology.</p>
+        </div>
+
+        <h3>1. Current P&L Calculation Logic</h3>
+        <div class="formula">
+P&L = (Current Forward Rate - Budgeted Forward Rate) × Contract Amount
+
+Where:
+- Current Forward Rate = Market forward rate for remaining days
+- Budgeted Forward Rate = 99.6775 INR/EUR (fixed at inception)
+- Contract Amount = $5,00,000
+        </div>
+
+        <h3>2. The Problem with Current Max Loss Calculation</h3>
+        
+        <div class="step">
+            <h4>Current Implementation:</h4>
+            <div class="formula">
+const maxLoss = Math.min(...pnlData.map(d => d.pnl))
+            </div>
+            <p>This simply finds the minimum P&L value from the daily projections, which is <strong>not correct</strong> for a forward contract.</p>
+        </div>
+
+        <div class="step">
+            <h4>Why This Is Wrong:</h4>
+            <ul>
+                <li>Forward contracts have <strong>unlimited upside and downside</strong></li>
+                <li>The "max loss" should be calculated based on <strong>extreme market scenarios</strong></li>
+                <li>Current calculation only looks at historical/projected data points</li>
+                <li>It doesn't account for <strong>potential maximum adverse movement</strong></li>
+            </ul>
+        </div>
+
+        <h3>3. Correct Max Loss Calculation</h3>
+        
+        <div class="calculation-box">
+            <h4>For EUR/INR Export Contract:</h4>
+            <p><strong>Max Loss occurs when EUR weakens significantly against INR</strong></p>
+            
+            <div class="formula">
+Theoretical Max Loss = (Minimum Possible Forward Rate - Budgeted Rate) × Amount
+
+For practical purposes:
+Max Loss = (Budgeted Rate × (1 - Maximum Expected Decline)) - Budgeted Rate × Amount
+
+Where Maximum Expected Decline might be:
+- 1-day 99% VaR: ~3-5%
+- 1-month 99% VaR: ~10-15%
+- Until maturity 99% VaR: ~20-25%
+            </div>
+        </div>
+
+        <div class="step">
+            <h4>Example Calculation with 20% Maximum Decline:</h4>
+            <div class="formula">
+Budgeted Forward Rate = 99.6775 INR/EUR
+Maximum Decline = 20%
+Minimum Forward Rate = 99.6775 × (1 - 0.20) = 79.742 INR/EUR
+
+Max Loss = (79.742 - 99.6775) × 5,00,000
+Max Loss = (-19.9355) × 5,00,000
+Max Loss = -₹99,67,750
+            </div>
+        </div>
+
+        <h2>🎯 Analysis of Optimal Exit Day</h2>
+
+        <div class="error-box">
+            <h3>⚠️ ISSUE WITH OPTIMAL EXIT CALCULATION</h3>
+            <p>The reported Optimal Exit of <strong>Day 84</strong> is also questionable.</p>
+        </div>
+
+        <h3>Current Implementation:</h3>
+        <div class="formula">
+optimalExitDay: pnlData.findIndex(d => d.pnl === maxProfit)
+        </div>
+
+        <div class="step">
+            <h4>Why Day 84 Doesn't Make Sense:</h4>
+            <ul>
+                <li><strong>Contract has 83 days to maturity</strong> - Day 84 would be past maturity</li>
+                <li>The contract would have <strong>already settled</strong> on Day 83</li>
+                <li>This suggests an <strong>off-by-one error</strong> in the calculation</li>
+                <li>Optimal exit should be based on <strong>risk-adjusted returns</strong>, not just maximum profit</li>
+            </ul>
+        </div>
+
+        <h3>Correct Optimal Exit Calculation:</h3>
+        <div class="calculation-box">
+            <h4>Factors to Consider:</h4>
+            <ul>
+                <li><strong>Risk-adjusted returns</strong> (Sharpe ratio)</li>
+                <li><strong>Time decay</strong> of the forward premium/discount</li>
+                <li><strong>Volatility</strong> and potential for further gains</li>
+                <li><strong>Liquidity</strong> and transaction costs</li>
+            </ul>
+            
+            <div class="formula">
+Optimal Exit = Day with Maximum (Expected Return / Risk)
+
+Rather than just Maximum Profit Day
+            </div>
+        </div>
+
+        <h2>🔧 Recommended Fixes</h2>
+
+        <div class="step">
+            <h4>1. Fix Max Loss Calculation:</h4>
+            <div class="formula">
+// Use VaR-based approach
+const maxLoss = calculateVaRBasedMaxLoss(
+    budgetedForwardRate, 
+    contractAmount, 
+    daysToMaturity, 
+    currencyPairVolatility
+)
+
+// Or use stress testing approach
+const maxLoss = calculateStressTestMaxLoss(
+    budgetedForwardRate,
+    contractAmount,
+    stressScenarios // e.g., 20% adverse movement
+)
+            </div>
+        </div>
+
+        <div class="step">
+            <h4>2. Fix Optimal Exit Calculation:</h4>
+            <div class="formula">
+// Calculate risk-adjusted optimal exit
+const optimalExitDay = calculateOptimalExit(
+    pnlData,
+    riskMetrics,
+    timeToMaturity
+)
+
+// Ensure it's within valid range
+optimalExitDay = Math.min(optimalExitDay, daysToMaturity)
+            </div>
+        </div>
+
+        <div class="step">
+            <h4>3. Add Proper Risk Metrics:</h4>
+            <div class="formula">
+// Calculate comprehensive risk metrics
+const riskMetrics = {
+    maxLoss: calculateVaRMaxLoss(confidence: 0.99),
+    expectedShortfall: calculateExpectedShortfall(),
+    sharpeRatio: calculateSharpeRatio(),
+    maxDrawdown: calculateMaxDrawdown(),
+    optimalExit: calculateRiskAdjustedOptimalExit()
+}
+            </div>
+        </div>
+
+        <h2>📊 Summary of Issues</h2>
+
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Metric</th>
+                    <th>Current Value</th>
+                    <th>Issue</th>
+                    <th>Recommended Fix</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Max Loss</td>
+                    <td>₹3,90,871.083</td>
+                    <td>Too conservative, only looks at historical data</td>
+                    <td>Use VaR-based calculation with stress scenarios</td>
+                </tr>
+                <tr>
+                    <td>Optimal Exit</td>
+                    <td>Day 84</td>
+                    <td>Beyond contract maturity (83 days)</td>
+                    <td>Fix off-by-one error, use risk-adjusted calculation</td>
+                </tr>
+                <tr>
+                    <td>Current P&L</td>
+                    <td>+₹3,94,743.387</td>
+                    <td>Appears reasonable</td>
+                    <td>Verify with live market data</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="result">
+            <h3>🎯 Conclusion</h3>
+            <p>Both the <strong>Max Loss</strong> and <strong>Optimal Exit</strong> calculations contain errors and should be corrected using proper financial risk management methodologies.</p>
+        </div>
+
+        <div class="highlight">
+            <h4>📝 Next Steps:</h4>
+            <ol>
+                <li>Implement VaR-based Max Loss calculation</li>
+                <li>Fix the Optimal Exit day calculation (ensure it's ≤ days to maturity)</li>
+                <li>Add proper risk-adjusted metrics</li>
+                <li>Validate all calculations with market data</li>
+            </ol>
+        </div>
+
+        <div style="text-align: center; margin-top: 30px; color: #7f8c8d;">
+            <p>Analysis Date: July 8, 2025</p>
+            <p>Contract: EUR/INR Export Forward</p>
+            <p>Status: ⚠️ <strong>REQUIRES CORRECTION</strong></p>
+        </div>
+    </div>
+</body>
+</html>

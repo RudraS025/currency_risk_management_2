@@ -4,17 +4,17 @@
  * Implementing your brilliant P&L methodology
  */
 
-// Current market interest rates (annual) - July 2025
+// ACCURATE CENTRAL BANK INTEREST RATES (annual) - Updated July 2025
 export const INTEREST_RATES = {
-  USD: 0.0450, // 4.50% Fed Funds
-  EUR: 0.0215, // 2.15% ECB Main Rate
+  USD: 0.0450, // 4.50% Federal Funds Rate (4.25-4.50% range - using midpoint)
+  EUR: 0.0215, // 2.15% ECB Main Refinancing Rate
   GBP: 0.0425, // 4.25% BoE Base Rate
   JPY: 0.0050, // 0.50% BoJ Policy Rate
   AUD: 0.0435, // 4.35% RBA Rate
   CAD: 0.0475, // 4.75% BoC Rate
   CHF: 0.0175, // 1.75% SNB Rate
   CNY: 0.0320, // 3.20% PBoC Rate
-  INR: 0.0650  // 6.50% RBI Repo Rate
+  INR: 0.0550  // 5.50% RBI Repo Rate (CORRECTED from 6.50%)
 } as const
 
 export interface DailyPnLEntry {

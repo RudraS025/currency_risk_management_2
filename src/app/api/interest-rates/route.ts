@@ -5,7 +5,7 @@ const interestRateSources = [
   {
     country: 'India',
     currency: 'INR',
-    rate: 6.50,
+    rate: 5.50,
     source: 'Reserve Bank of India',
     instrumentName: 'Repo Rate',
     lastUpdated: new Date().toISOString(),

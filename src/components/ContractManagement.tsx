@@ -4,9 +4,11 @@ import { useState } from 'react'
 import { Plus, Edit, Trash2, DollarSign } from 'lucide-react'
 import { useCurrency, type Contract } from '@/contexts/CurrencyContext'
 import { format } from 'date-fns'
+import { toast } from 'react-hot-toast'
+import { INTEREST_RATES } from '@/lib/enhanced-financial-utils'
 
 export default function ContractManagement() {
-  const { state, addContract, updateContract, deleteContract } = useCurrency()
+  const { state, addContract, updateContract, deleteContract, initializeContractWithLiveRate } = useCurrency()
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [editingContract, setEditingContract] = useState<Contract | null>(null)
 
@@ -40,32 +42,74 @@ export default function ContractManagement() {
     { value: 'option', label: 'Currency Option' },
   ]
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    // Calculate budgeted forward rate (mock calculation)
-    const spotRate = 85.40 // This would come from live data
-    const budgetedForwardRate = spotRate * (1 + 0.015) // Simple forward calculation
-    
-    const contractData = {
-      contractDate: new Date(formData.contractDate),
-      maturityDate: new Date(formData.maturityDate),
-      currencyPair: formData.currencyPair,
-      amount: parseFloat(formData.amount),
-      contractType: formData.contractType,
-      budgetedForwardRate,
-      currentForwardRate: budgetedForwardRate,
-      spotRate,
-      pnl: 0,
-      status: 'active' as const,
-      description: formData.description,
-    }
+    try {
+      if (editingContract) {
+        // For updating existing contracts, use the old method
+        const rateInfo = state.currencyRates.find(r => r.pair === formData.currencyPair)
+        if (!rateInfo) {
+          toast.error(`No live rate available for ${formData.currencyPair}`)
+          return
+        }
+        
+        const spotRate = rateInfo.spotRate
+        const maturityDays = Math.ceil((new Date(formData.maturityDate).getTime() - new Date(formData.contractDate).getTime()) / (1000 * 60 * 60 * 24))
+        
+        // Calculate accurate budgeted forward rate using Interest Rate Parity
+        const [baseCurrency, quoteCurrency] = formData.currencyPair.split('/')
+        const foreignRate = INTEREST_RATES[baseCurrency as keyof typeof INTEREST_RATES] || 0.05
+        const domesticRate = INTEREST_RATES[quoteCurrency as keyof typeof INTEREST_RATES] || 0.055
+        
+        const budgetedForwardRate = spotRate * Math.exp((foreignRate - domesticRate) * (maturityDays / 365))
+        
+        const contractData = {
+          ...editingContract,
+          contractDate: new Date(formData.contractDate),
+          maturityDate: new Date(formData.maturityDate),
+          currencyPair: formData.currencyPair,
+          amount: parseFloat(formData.amount),
+          contractType: formData.contractType,
+          budgetedForwardRate,
+          currentForwardRate: budgetedForwardRate,
+          spotRate,
+          description: formData.description,
+        }
+        
+        updateContract(contractData)
+        setEditingContract(null)
+      } else {
+        // For new contracts, use the enhanced method
+        await initializeContractWithLiveRate({
+          contractDate: new Date(formData.contractDate),
+          maturityDate: new Date(formData.maturityDate),
+          currencyPair: formData.currencyPair,
+          amount: parseFloat(formData.amount),
+          contractType: formData.contractType,
+          currentForwardRate: 0, // Will be calculated
+          spotRate: 0, // Will be calculated
+          pnl: 0,
+          status: 'active',
+          description: formData.description,
+        })
+      }
 
-    if (editingContract) {
-      updateContract({ ...editingContract, ...contractData })
-      setEditingContract(null)
-    } else {
-      addContract(contractData)
+      // Reset form
+      setFormData({
+        contractDate: format(new Date(), 'yyyy-MM-dd'),
+        maturityDate: '',
+        currencyPair: 'USD/INR',
+        amount: '',
+        contractType: 'export',
+        description: '',
+      })
+      setShowCreateForm(false)
+      toast.success('Contract created successfully with live rates!')
+      
+    } catch (error) {
+      console.error('Error creating contract:', error)
+      toast.error('Error creating contract. Please try again.')
     }
 
     // Reset form

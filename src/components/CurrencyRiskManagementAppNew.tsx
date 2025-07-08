@@ -132,18 +132,11 @@ export default function CurrencyRiskManagementApp() {
           </TabsContent>
 
           <TabsContent value="analytics" className="space-y-6">
-            <PnLAnalytics 
-              contracts={contracts}
-              currencyRates={currencyRates}
-              interestRates={interestRates}
-            />
+            <PnLAnalytics />
           </TabsContent>
 
           <TabsContent value="reporting" className="space-y-6">
-            <RiskReporting 
-              contracts={contracts}
-              currencyRates={currencyRates}
-            />
+            <RiskReporting />
           </TabsContent>
         </Tabs>
       </main>
