@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CORRECTED Forward Rate Calculation</title>
+    <style>
+        body {
+            font-family: 'Consolas', 'Monaco', monospace;
+            background-color: #1a1a1a;
+            color: #00ff00;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .title {
+            color: #00ffff;
+            text-align: center;
+            font-size: 24px;
+            margin-bottom: 30px;
+        }
+        .section {
+            margin-bottom: 25px;
+            padding: 20px;
+            background-color: #2a2a2a;
+            border-radius: 8px;
+            border-left: 4px solid #00ffff;
+        }
+        .section h3 {
+            color: #ffff00;
+            margin-top: 0;
+            font-size: 18px;
+        }
+        .formula {
+            background-color: #1a1a1a;
+            padding: 15px;
+            border-radius: 5px;
+            font-size: 16px;
+            color: #00ffff;
+            margin: 10px 0;
+        }
+        .calculation {
+            background-color: #003300;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .highlight {
+            color: #ffff00;
+            font-weight: bold;
+        }
+        .positive {
+            color: #00ff00;
+        }
+        .negative {
+            color: #ff6666;
+        }
+        .neutral {
+            color: #ffffff;
+        }
+        .key-point {
+            background-color: #4a4a00;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+            color: #ffffff;
+            border: 2px solid #ffff00;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+        th, td {
+            border: 1px solid #555;
+            padding: 8px;
+            text-align: right;
+        }
+        th {
+            background-color: #3a3a3a;
+            color: #00ffff;
+        }
+        .day-1 {
+            background-color: #004400;
+        }
+        .day-2 {
+            background-color: #440000;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="title">🔧 CORRECTED FORWARD RATE CALCULATION</div>
+        
+        <div class="section">
+            <h3>✅ CORRECTED UNDERSTANDING</h3>
+            <div class="key-point">
+                <strong>KEY CORRECTION:</strong><br>
+                • Day 1 Forward Rate = Day 1 Spot Rate × e^((r_foreign - r_domestic) × t)<br>
+                • This calculated Day 1 forward rate BECOMES the Budgeted Forward Rate<br>
+                • The Budgeted Forward Rate remains constant for the entire contract period<br>
+                • Day 1 P&L = 0 (by definition)<br>
+                • Day 2+ P&L = (Today's Forward - Yesterday's Forward) × Amount
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>1. Day 1 Forward Rate Calculation</h3>
+            <div class="formula">
+                Day 1 Forward Rate = Spot Rate × e^((r_foreign - r_domestic) × t)
+            </div>
+            
+            <div class="calculation" id="day1-calculation">
+                <strong>Day 1 Calculation:</strong><br>
+                <!-- Will be populated by JavaScript -->
+            </div>
+            
+            <div class="key-point">
+                <strong>This Day 1 forward rate IS the budgeted forward rate for the entire contract!</strong>
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>2. Comparison with Your Data</h3>
+            <div id="comparison-table">
+                <!-- Will be populated by JavaScript -->
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>3. P&L Calculation Logic</h3>
+            <div id="pnl-explanation">
+                <!-- Will be populated by JavaScript -->
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>4. Sample Daily Analysis</h3>
+            <div id="daily-analysis">
+                <!-- Will be populated by JavaScript -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Market data from your example
+        const INTEREST_RATES = {
+            USD: 0.0450, // 4.50%
+            INR: 0.0650  // 6.50%
+        };
+
+        const yourData = {
+            spotRate: 85.8043,
+            originalBudgetedForward: 86.6810,
+            daysToMaturity: 85,
+            contractAmount: 500000
+        };
+
+        function calculateForwardRate(spotRate, baseCurrency, quoteCurrency, daysToMaturity) {
+            const t = daysToMaturity / 365;
+            const r_base = INTEREST_RATES[baseCurrency] || 0.05;
+            const r_quote = INTEREST_RATES[quoteCurrency] || 0.05;
+            const forwardFactor = Math.exp((r_base - r_quote) * t);
+            return spotRate * forwardFactor;
+        }
+
+        function runCorrectedAnalysis() {
+            const t = yourData.daysToMaturity / 365;
+            const r_foreign = INTEREST_RATES.USD;
+            const r_domestic = INTEREST_RATES.INR;
+            const forwardFactor = Math.exp((r_foreign - r_domestic) * t);
+            
+            // Calculate the CORRECTED Day 1 forward rate
+            const correctedDay1Forward = yourData.spotRate * forwardFactor;
+            
+            // Day 1 calculation display
+            document.getElementById('day1-calculation').innerHTML = `
+                <strong>Day 1 Forward Rate Calculation:</strong><br>
+                • Spot Rate: ${yourData.spotRate}<br>
+                • USD Rate: ${(r_foreign * 100).toFixed(2)}%<br>
+                • INR Rate: ${(r_domestic * 100).toFixed(2)}%<br>
+                • Rate Differential: ${((r_foreign - r_domestic) * 100).toFixed(2)}%<br>
+                • Time to Maturity: ${t.toFixed(4)} years<br>
+                • Forward Factor: e^(${(r_foreign - r_domestic).toFixed(4)} × ${t.toFixed(4)}) = ${forwardFactor.toFixed(6)}<br>
+                • <span class="highlight">Day 1 Forward Rate: ${yourData.spotRate} × ${forwardFactor.toFixed(6)} = ${correctedDay1Forward.toFixed(4)}</span><br>
+                • <span class="highlight">This IS the Budgeted Forward Rate!</span>
+            `;
+            
+            // Comparison table
+            document.getElementById('comparison-table').innerHTML = `
+                <table>
+                    <tr>
+                        <th>Metric</th>
+                        <th>Your Data</th>
+                        <th>Corrected Calculation</th>
+                        <th>Difference</th>
+                    </tr>
+                    <tr>
+                        <td>Day 1 Spot Rate</td>
+                        <td>${yourData.spotRate}</td>
+                        <td>${yourData.spotRate}</td>
+                        <td class="neutral">✓ Same</td>
+                    </tr>
+                    <tr>
+                        <td>Day 1 Forward Rate</td>
+                        <td>${yourData.originalBudgetedForward}</td>
+                        <td>${correctedDay1Forward.toFixed(4)}</td>
+                        <td class="${Math.abs(yourData.originalBudgetedForward - correctedDay1Forward) < 0.01 ? 'positive' : 'negative'}">
+                            ${(yourData.originalBudgetedForward - correctedDay1Forward).toFixed(4)}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Budgeted Forward Rate</td>
+                        <td>${yourData.originalBudgetedForward} (fixed)</td>
+                        <td>${correctedDay1Forward.toFixed(4)} (from Day 1 calculation)</td>
+                        <td class="${Math.abs(yourData.originalBudgetedForward - correctedDay1Forward) < 0.01 ? 'positive' : 'negative'}">
+                            ${Math.abs(yourData.originalBudgetedForward - correctedDay1Forward) < 0.01 ? 'Matches' : 'Different'}
+                        </td>
+                    </tr>
+                </table>
+            `;
+            
+            // P&L explanation
+            const day1PnL = 0; // Always 0 by definition
+            const day2Forward = calculateForwardRate(yourData.spotRate, 'USD', 'INR', yourData.daysToMaturity - 1);
+            const day2PnL = (day2Forward - correctedDay1Forward) * yourData.contractAmount;
+            
+            document.getElementById('pnl-explanation').innerHTML = `
+                <div class="calculation">
+                    <strong>Day 1 P&L:</strong><br>
+                    • By definition: Day 1 P&L = 0<br>
+                    • Formula: (Day 1 Forward - Day 1 Forward) × Amount = 0<br>
+                    • Result: <span class="neutral">₹0</span>
+                </div>
+                
+                <div class="calculation">
+                    <strong>Day 2 P&L:</strong><br>
+                    • Day 2 Forward Rate: ${day2Forward.toFixed(4)}<br>
+                    • Day 1 Forward Rate: ${correctedDay1Forward.toFixed(4)}<br>
+                    • Difference: ${(day2Forward - correctedDay1Forward).toFixed(4)}<br>
+                    • P&L: (${day2Forward.toFixed(4)} - ${correctedDay1Forward.toFixed(4)}) × ${yourData.contractAmount}<br>
+                    • Result: <span class="${day2PnL >= 0 ? 'positive' : 'negative'}">₹${day2PnL.toLocaleString()}</span>
+                </div>
+            `;
+            
+            // Daily analysis sample
+            let dailyTable = `
+                <table>
+                    <tr>
+                        <th>Day</th>
+                        <th>Days to Mat</th>
+                        <th>Spot Rate</th>
+                        <th>Forward Rate</th>
+                        <th>Budgeted Forward</th>
+                        <th>Daily P&L</th>
+                        <th>Status</th>
+                    </tr>
+            `;
+            
+            let previousForward = correctedDay1Forward;
+            
+            for (let day = 1; day <= 5; day++) {
+                const daysToMat = yourData.daysToMaturity - (day - 1);
+                const forwardRate = day === 1 ? correctedDay1Forward : calculateForwardRate(yourData.spotRate, 'USD', 'INR', daysToMat);
+                const dailyPnL = day === 1 ? 0 : (forwardRate - previousForward) * yourData.contractAmount;
+                const rowClass = day === 1 ? 'day-1' : (day === 2 ? 'day-2' : '');
+                
+                dailyTable += `
+                    <tr class="${rowClass}">
+                        <td>${day}</td>
+                        <td>${daysToMat}</td>
+                        <td>${yourData.spotRate}</td>
+                        <td>${forwardRate.toFixed(4)}</td>
+                        <td>${correctedDay1Forward.toFixed(4)}</td>
+                        <td class="${dailyPnL >= 0 ? 'positive' : 'negative'}">₹${dailyPnL.toLocaleString()}</td>
+                        <td>${day === 1 ? 'Budgeted Rate Set' : 'Calculated Fresh'}</td>
+                    </tr>
+                `;
+                
+                previousForward = forwardRate;
+            }
+            
+            dailyTable += '</table>';
+            document.getElementById('daily-analysis').innerHTML = dailyTable;
+        }
+
+        // Run analysis when page loads
+        window.onload = runCorrectedAnalysis;
+    </script>
+</body>
+</html>

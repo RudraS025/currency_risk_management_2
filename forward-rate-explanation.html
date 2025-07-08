@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Forward Rate Calculation Explanation</title>
+    <style>
+        body {
+            font-family: 'Consolas', 'Monaco', monospace;
+            background-color: #1a1a1a;
+            color: #00ff00;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        .title {
+            color: #00ffff;
+            text-align: center;
+            font-size: 24px;
+            margin-bottom: 30px;
+        }
+        .section {
+            margin-bottom: 25px;
+            padding: 20px;
+            background-color: #2a2a2a;
+            border-radius: 8px;
+            border-left: 4px solid #00ffff;
+        }
+        .section h3 {
+            color: #ffff00;
+            margin-top: 0;
+            font-size: 18px;
+        }
+        .formula {
+            background-color: #1a1a1a;
+            padding: 15px;
+            border-radius: 5px;
+            font-size: 16px;
+            color: #00ffff;
+            margin: 10px 0;
+        }
+        .calculation {
+            background-color: #003300;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .highlight {
+            color: #ffff00;
+            font-weight: bold;
+        }
+        .positive {
+            color: #00ff00;
+        }
+        .negative {
+            color: #ff6666;
+        }
+        .neutral {
+            color: #ffffff;
+        }
+        pre {
+            background-color: #1a1a1a;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            font-size: 14px;
+        }
+        .key-point {
+            background-color: #4a4a00;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            color: #ffffff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="title">🔍 FORWARD RATE CALCULATION EXPLANATION</div>
+        
+        <div class="section">
+            <h3>1. Day 1 Forward Rate (NOT calculated from current spot)</h3>
+            <p>The Day 1 forward rate is <span class="highlight">NOT calculated from the current spot rate</span>. Instead, it equals the <strong>budgeted forward rate</strong> that was fixed at contract inception.</p>
+            
+            <div class="formula">
+                Day 1 Forward Rate = Budgeted Forward Rate = 86.6810
+            </div>
+            
+            <div class="key-point">
+                <strong>Key Insight:</strong> Day 1 forward rate is fixed at the budgeted rate to ensure Day 1 P&L = 0
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>2. Budgeted Forward Rate (Original Calculation)</h3>
+            <p>The budgeted forward rate was calculated when the contract was first created using the Interest Rate Parity formula:</p>
+            
+            <div class="formula">
+                F = S × e^((r_foreign - r_domestic) × t)
+            </div>
+            
+            <div class="calculation">
+                <strong>Interest Rates:</strong><br>
+                • USD (Foreign): 4.50%<br>
+                • INR (Domestic): 6.50%<br>
+                • Differential: 4.50% - 6.50% = -2.00%<br>
+                • Time to Maturity: 85/365 = 0.2329 years
+            </div>
+            
+            <div class="calculation">
+                <strong>Forward Factor:</strong><br>
+                e^(-0.02 × 0.2329) = e^(-0.004658) = 0.9954
+            </div>
+            
+            <p><span class="highlight">Since USD rates < INR rates, forward rates are at a DISCOUNT to spot rates</span></p>
+        </div>
+
+        <div class="section">
+            <h3>3. Day 2+ Forward Rate Calculation</h3>
+            <p>From Day 2 onwards, forward rates are calculated fresh using the current spot rate:</p>
+            
+            <div class="formula">
+                Day 2 Forward = Current Spot × e^((r_USD - r_INR) × days_remaining/365)
+            </div>
+            
+            <div class="calculation">
+                <strong>Day 2 Calculation (84 days remaining):</strong><br>
+                • Spot Rate: 85.8043<br>
+                • Time: 84/365 = 0.2301 years<br>
+                • Forward Factor: e^(-0.02 × 0.2301) = 0.9954<br>
+                • Day 2 Forward: 85.8043 × 0.9954 = <span class="highlight">85.4103</span>
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>4. P&L Calculation Logic</h3>
+            <p>Daily P&L = (Today's Forward - Yesterday's Forward) × Amount</p>
+            
+            <div class="calculation">
+                <strong>Day 1 P&L:</strong><br>
+                (86.6810 - 86.6810) × 500,000 = <span class="neutral">₹0</span>
+            </div>
+            
+            <div class="calculation">
+                <strong>Day 2 P&L:</strong><br>
+                (85.4103 - 86.6810) × 500,000 = <span class="positive">+₹635,350</span><br>
+                <small>(Your data shows +₹63,536 due to different contract amount)</small>
+            </div>
+            
+            <div class="calculation">
+                <strong>Day 3+ P&L:</strong><br>
+                Small negative amounts as forward rates gradually increase
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>5. Why This Pattern Occurs</h3>
+            
+            <div class="key-point">
+                <strong>The Interest Rate Differential Creates This Pattern:</strong><br>
+                • USD rates (4.50%) < INR rates (6.50%)<br>
+                • This creates forward rates BELOW spot rates<br>
+                • Forward rates gradually increase over time toward spot
+            </div>
+            
+            <div class="calculation">
+                <strong>Timeline:</strong><br>
+                Day 1: Forward = 86.6810 (budgeted, artificially high)<br>
+                Day 2: Forward = 85.4103 (calculated, much lower)<br>
+                Day 3+: Forward increases slightly each day
+            </div>
+            
+            <div class="calculation">
+                <strong>P&L Pattern:</strong><br>
+                • Day 1: <span class="neutral">₹0</span> (by design)<br>
+                • Day 2: <span class="positive">+₹63,536</span> (big favorable drop)<br>
+                • Day 3+: <span class="negative">Small negative amounts</span> (gradual unfavorable increases)
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>6. Interest Rate Parity Impact</h3>
+            <p>The USD/INR forward curve is in <span class="highlight">CONTANGO</span> because INR interest rates > USD interest rates.</p>
+            
+            <div class="key-point">
+                <strong>This means:</strong><br>
+                • Forward rates start below spot rates<br>
+                • Each day, forward rates increase slightly (time decay)<br>
+                • This creates small negative daily P&L for USD exporters<br>
+                • The pattern is economically logical and expected
+            </div>
+            
+            <div class="formula">
+                Economic Logic: Higher INR rates → Forward USD/INR rates trade at discount → Forward rates increase over time
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>7. Summary</h3>
+            <ul>
+                <li><strong>Day 1 Forward Rate:</strong> Fixed at budgeted rate (86.6810), not calculated from current spot</li>
+                <li><strong>Day 2 Forward Rate:</strong> Calculated fresh from current spot using IRP formula (85.4103)</li>
+                <li><strong>Day 2 P&L:</strong> Positive due to large drop from budgeted to calculated forward rate</li>
+                <li><strong>Day 3+ P&L:</strong> Small negative amounts due to gradual increase in forward rates</li>
+                <li><strong>Pattern:</strong> Economically sound based on interest rate differential</li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html>

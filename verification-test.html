@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Currency Risk Management - Verification Test</title>
+    <style>
+        body {
+            font-family: 'Consolas', 'Monaco', monospace;
+            background-color: #1a1a1a;
+            color: #00ff00;
+            padding: 20px;
+            line-height: 1.4;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .title {
+            color: #00ffff;
+            text-align: center;
+            font-size: 24px;
+            margin-bottom: 30px;
+        }
+        .section {
+            margin-bottom: 20px;
+            padding: 15px;
+            background-color: #2a2a2a;
+            border-radius: 5px;
+        }
+        .section h3 {
+            color: #ffff00;
+            margin-top: 0;
+        }
+        .success {
+            color: #00ff00;
+        }
+        .error {
+            color: #ff0000;
+        }
+        .warning {
+            color: #ffaa00;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        th, td {
+            border: 1px solid #555;
+            padding: 8px;
+            text-align: right;
+        }
+        th {
+            background-color: #3a3a3a;
+            color: #00ffff;
+        }
+        .day-1 {
+            background-color: #004400;
+        }
+        pre {
+            background-color: #1a1a1a;
+            padding: 10px;
+            border-radius: 3px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="title">🚀 CURRENCY RISK MANAGEMENT - VERIFICATION TEST</div>
+        
+        <div class="section">
+            <h3>Test Results</h3>
+            <div id="results">Running test...</div>
+        </div>
+        
+        <div class="section">
+            <h3>Daily P&L Analysis</h3>
+            <div id="analysis"></div>
+        </div>
+    </div>
+
+    <script>
+        // Import the test script content
+        const INTEREST_RATES = {
+            USD: 0.0450, EUR: 0.0215, GBP: 0.0425, JPY: 0.0050,
+            AUD: 0.0435, CAD: 0.0475, CHF: 0.0175, CNY: 0.0320, INR: 0.0650
+        };
+
+        function calculateBudgetedForwardRate(inceptionSpotRate, currencyPair, contractMaturityDays) {
+            const [baseCurrency, quoteCurrency] = currencyPair.split('/');
+            const t = contractMaturityDays / 365;
+            const r_foreign = INTEREST_RATES[baseCurrency] || 0.045;
+            const r_domestic = INTEREST_RATES[quoteCurrency] || 0.065;
+            const forwardFactor = Math.exp((r_foreign - r_domestic) * t);
+            return inceptionSpotRate * forwardFactor;
+        }
+
+        function calculateForwardRate(spotRate, baseCurrency, quoteCurrency, daysToMaturity) {
+            const t = daysToMaturity / 365;
+            const r_base = INTEREST_RATES[baseCurrency] || 0.05;
+            const r_quote = INTEREST_RATES[quoteCurrency] || 0.05;
+            const forwardFactor = Math.exp((r_base - r_quote) * t);
+            return spotRate * forwardFactor;
+        }
+
+        function createCubicSplineAnchors(currentSpotRate, currencyPair, maxDaysToMaturity, budgetedForwardRate, isInceptionDay) {
+            const [baseCurrency, quoteCurrency] = currencyPair.split('/');
+            const anchors = [];
+            
+            if (isInceptionDay && budgetedForwardRate) {
+                const anchorDays = [1, 7, 30, 60, 90, 120, 180];
+                for (const days of anchorDays) {
+                    if (days <= maxDaysToMaturity) {
+                        anchors.push({
+                            daysToMaturity: days,
+                            forwardRate: budgetedForwardRate,
+                            timeToMaturity: days / 365
+                        });
+                    }
+                }
+                anchors.push({
+                    daysToMaturity: maxDaysToMaturity,
+                    forwardRate: budgetedForwardRate,
+                    timeToMaturity: maxDaysToMaturity / 365
+                });
+            } else {
+                const anchorDays = [1, 7, 30, 60, 90, 120, 180, 365];
+                for (const days of anchorDays) {
+                    if (days <= maxDaysToMaturity) {
+                        const forwardRate = calculateForwardRate(currentSpotRate, baseCurrency, quoteCurrency, days);
+                        anchors.push({
+                            daysToMaturity: days,
+                            forwardRate,
+                            timeToMaturity: days / 365
+                        });
+                    }
+                }
+                if (!anchorDays.includes(maxDaysToMaturity)) {
+                    const maturityForwardRate = calculateForwardRate(currentSpotRate, baseCurrency, quoteCurrency, maxDaysToMaturity);
+                    anchors.push({
+                        daysToMaturity: maxDaysToMaturity,
+                        forwardRate: maturityForwardRate,
+                        timeToMaturity: maxDaysToMaturity / 365
+                    });
+                }
+            }
+            
+            return anchors.sort((a, b) => a.daysToMaturity - b.daysToMaturity);
+        }
+
+        function interpolateCubicSplineForwardRate(anchors, daysToMaturity) {
+            if (anchors.length === 0) return 0;
+            
+            const exactAnchor = anchors.find(a => a.daysToMaturity === daysToMaturity);
+            if (exactAnchor) return exactAnchor.forwardRate;
+            
+            if (daysToMaturity <= anchors[0].daysToMaturity) {
+                return anchors[0].forwardRate;
+            }
+            
+            if (daysToMaturity >= anchors[anchors.length - 1].daysToMaturity) {
+                return anchors[anchors.length - 1].forwardRate;
+            }
+            
+            let i = 0;
+            while (i < anchors.length - 1 && anchors[i + 1].daysToMaturity < daysToMaturity) {
+                i++;
+            }
+            
+            const x0 = anchors[i].daysToMaturity;
+            const x1 = anchors[i + 1].daysToMaturity;
+            const y0 = anchors[i].forwardRate;
+            const y1 = anchors[i + 1].forwardRate;
+            
+            const t = (daysToMaturity - x0) / (x1 - x0);
+            return y0 + t * (y1 - y0);
+        }
+
+        function generateDailyPnLAnalysis(contract, currentSpotRate, currentDate = new Date()) {
+            const totalDays = Math.ceil((contract.maturityDate.getTime() - contract.contractDate.getTime()) / (1000 * 60 * 60 * 24));
+            const remainingDays = Math.ceil((contract.maturityDate.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24));
+            
+            const anchorsForDay1 = createCubicSplineAnchors(currentSpotRate, contract.currencyPair, remainingDays, contract.budgetedForwardRate, true);
+            const anchorsForDay2Plus = createCubicSplineAnchors(currentSpotRate, contract.currencyPair, remainingDays, contract.budgetedForwardRate, false);
+            
+            const dailyEntries = [];
+            let cumulativePnL = 0;
+            let previousForwardRate = contract.budgetedForwardRate;
+            
+            for (let day = 0; day < Math.min(remainingDays, 7); day++) {
+                const entryDate = new Date(currentDate);
+                entryDate.setDate(entryDate.getDate() + day);
+                
+                const daysToMaturity = remainingDays - day;
+                
+                let currentForwardRate;
+                if (day === 0) {
+                    currentForwardRate = contract.budgetedForwardRate;
+                } else {
+                    currentForwardRate = interpolateCubicSplineForwardRate(anchorsForDay2Plus, daysToMaturity);
+                }
+                
+                let dailyPnL;
+                if (day === 0) {
+                    dailyPnL = 0;
+                } else {
+                    dailyPnL = (currentForwardRate - previousForwardRate) * contract.amount;
+                    if (contract.contractType === 'import') {
+                        dailyPnL = -dailyPnL;
+                    }
+                }
+                
+                cumulativePnL += dailyPnL;
+                
+                let markToMarket = (currentForwardRate - contract.budgetedForwardRate) * contract.amount;
+                if (contract.contractType === 'import') {
+                    markToMarket = -markToMarket;
+                }
+                
+                const volatility = Math.abs(currentForwardRate - contract.budgetedForwardRate) / contract.budgetedForwardRate * 100;
+                
+                dailyEntries.push({
+                    date: entryDate,
+                    dayNumber: day + 1,
+                    daysToMaturity,
+                    liveSpotRate: currentSpotRate,
+                    cubicSplineForwardRate: currentForwardRate,
+                    budgetedForwardRate: contract.budgetedForwardRate,
+                    dailyPnL,
+                    cumulativePnL,
+                    markToMarket,
+                    unrealizedPnL: markToMarket,
+                    volatility,
+                    timeDecay: 0,
+                    isToday: day === 0,
+                    isPast: false
+                });
+                
+                previousForwardRate = currentForwardRate;
+            }
+            
+            return {
+                dailyEntries,
+                riskMetrics: { maxDrawdown: 0, maxProfit: 0, valueAtRisk: 0, volatilityScore: 0, riskRating: 'Low' },
+                cubicSplineAnchors: anchorsForDay1
+            };
+        }
+
+        // Run the test
+        function runTest() {
+            const testContract = {
+                id: 'test-1',
+                contractDate: new Date('2025-01-01'),
+                maturityDate: new Date('2025-09-30'),
+                currencyPair: 'USD/INR',
+                amount: 500000,
+                contractType: 'export',
+                budgetedForwardRate: 86.6810,
+                inceptionSpotRate: 85.5400
+            };
+
+            const currentSpotRate = 85.5400;
+            const currentDate = new Date('2025-07-07');
+
+            let results = '<h3>🔍 VERIFICATION RESULTS</h3>';
+            
+            // Test 1: Budgeted forward rate calculation
+            const calculatedBudgetedRate = calculateBudgetedForwardRate(
+                testContract.inceptionSpotRate,
+                testContract.currencyPair,
+                Math.ceil((testContract.maturityDate.getTime() - testContract.contractDate.getTime()) / (1000 * 60 * 60 * 24))
+            );
+            
+            results += `<div class="section">`;
+            results += `<h4>1. Budgeted Forward Rate Verification</h4>`;
+            results += `<p>Expected: ${testContract.budgetedForwardRate}</p>`;
+            results += `<p>Calculated: ${calculatedBudgetedRate.toFixed(4)}</p>`;
+            results += `<p class="${Math.abs(calculatedBudgetedRate - testContract.budgetedForwardRate) < 0.1 ? 'success' : 'error'}">`;
+            results += `Match: ${Math.abs(calculatedBudgetedRate - testContract.budgetedForwardRate) < 0.1 ? '✅ PASS' : '❌ FAIL'}`;
+            results += `</p>`;
+            results += `</div>`;
+
+            // Test 2: Daily analysis
+            const analysis = generateDailyPnLAnalysis(testContract, currentSpotRate, currentDate);
+            const day1Entry = analysis.dailyEntries[0];
+            
+            results += `<div class="section">`;
+            results += `<h4>2. Day 1 Verification</h4>`;
+            results += `<p>Day 1 Forward Rate: ${day1Entry.cubicSplineForwardRate.toFixed(4)}</p>`;
+            results += `<p>Budgeted Forward Rate: ${day1Entry.budgetedForwardRate.toFixed(4)}</p>`;
+            results += `<p class="${Math.abs(day1Entry.cubicSplineForwardRate - day1Entry.budgetedForwardRate) < 0.0001 ? 'success' : 'error'}">`;
+            results += `Day 1 Forward = Budgeted: ${Math.abs(day1Entry.cubicSplineForwardRate - day1Entry.budgetedForwardRate) < 0.0001 ? '✅ PASS' : '❌ FAIL'}`;
+            results += `</p>`;
+            results += `<p>Day 1 P&L: ${day1Entry.dailyPnL.toFixed(2)}</p>`;
+            results += `<p class="${Math.abs(day1Entry.dailyPnL) < 0.01 ? 'success' : 'error'}">`;
+            results += `Day 1 P&L = 0: ${Math.abs(day1Entry.dailyPnL) < 0.01 ? '✅ PASS' : '❌ FAIL'}`;
+            results += `</p>`;
+            results += `</div>`;
+
+            document.getElementById('results').innerHTML = results;
+
+            // Create analysis table
+            let analysisTable = '<table>';
+            analysisTable += '<tr><th>Date</th><th>Day</th><th>Days to Mat</th><th>Live Spot</th><th>Cubic Spline Forward</th><th>Budgeted Forward</th><th>Daily P&L</th><th>Cumulative P&L</th><th>MTM</th><th>Volatility</th></tr>';
+            
+            analysis.dailyEntries.forEach((entry, index) => {
+                const dateStr = entry.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                const rowClass = entry.dayNumber === 1 ? 'day-1' : '';
+                
+                analysisTable += `<tr class="${rowClass}">`;
+                analysisTable += `<td>${dateStr}${entry.isToday ? ' (Today)' : ''}</td>`;
+                analysisTable += `<td>${entry.dayNumber}</td>`;
+                analysisTable += `<td>${entry.daysToMaturity}</td>`;
+                analysisTable += `<td>${entry.liveSpotRate.toFixed(4)}</td>`;
+                analysisTable += `<td>${entry.cubicSplineForwardRate.toFixed(4)}</td>`;
+                analysisTable += `<td>${entry.budgetedForwardRate.toFixed(4)}</td>`;
+                analysisTable += `<td>${entry.dailyPnL >= 0 ? '+' : ''}₹${entry.dailyPnL.toLocaleString()}</td>`;
+                analysisTable += `<td>${entry.cumulativePnL >= 0 ? '+' : ''}₹${entry.cumulativePnL.toLocaleString()}</td>`;
+                analysisTable += `<td>${entry.markToMarket >= 0 ? '+' : ''}₹${entry.markToMarket.toLocaleString()}</td>`;
+                analysisTable += `<td>${entry.volatility.toFixed(2)}%</td>`;
+                analysisTable += '</tr>';
+            });
+            
+            analysisTable += '</table>';
+            document.getElementById('analysis').innerHTML = analysisTable;
+        }
+
+        // Run test when page loads
+        window.onload = runTest;
+    </script>
+</body>
+</html>
