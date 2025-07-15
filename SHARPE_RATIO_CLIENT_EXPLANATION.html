@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sharpe Ratio Explanation - Client Briefing</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            border-bottom: 3px solid #e74c3c;
+            padding-bottom: 10px;
+            margin-bottom: 30px;
+        }
+        h2 {
+            color: #34495e;
+            border-left: 4px solid #e74c3c;
+            padding-left: 15px;
+            margin-top: 30px;
+        }
+        .metric-display {
+            background: #fff5f5;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            margin: 20px 0;
+            border-left: 4px solid #e74c3c;
+        }
+        .metric-value {
+            font-size: 48px;
+            font-weight: bold;
+            color: #e74c3c;
+            margin: 10px 0;
+        }
+        .explanation-box {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            border-left: 4px solid #3498db;
+        }
+        .warning-box {
+            background: #fff3cd;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            border-left: 4px solid #ffc107;
+        }
+        .good-box {
+            background: #d4edda;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            border-left: 4px solid #27ae60;
+        }
+        .formula {
+            background: #f4f4f4;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            margin: 10px 0;
+            text-align: center;
+        }
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        .comparison-table th, .comparison-table td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: center;
+        }
+        .comparison-table th {
+            background: #f8f9fa;
+            font-weight: bold;
+        }
+        .key-point {
+            background: #e8f5e8;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            border-left: 4px solid #27ae60;
+        }
+        .client-summary {
+            background: #e3f2fd;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            border-left: 4px solid #2196f3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Sharpe Ratio Explanation</h1>
+        <h2>Client Briefing - Currency Risk Management</h2>
+
+        <div class="metric-display">
+            <h3>Current Portfolio Sharpe Ratio</h3>
+            <div class="metric-value">-5.98</div>
+            <p><strong>This indicates poor risk-adjusted performance</strong></p>
+        </div>
+
+        <h2>🎯 What is the Sharpe Ratio?</h2>
+        
+        <div class="explanation-box">
+            <h3>Simple Definition:</h3>
+            <p>The Sharpe Ratio measures how much <strong>extra return</strong> you're getting for the <strong>extra risk</strong> you're taking with your currency forward contracts.</p>
+            
+            <p>Think of it as: <strong>"Return per unit of risk"</strong></p>
+        </div>
+
+        <div class="formula">
+            <h4>Sharpe Ratio Formula:</h4>
+            <strong>Sharpe Ratio = (Portfolio Return - Risk-Free Rate) ÷ Portfolio Volatility</strong>
+            <br><br>
+            <em>In simple terms:</em><br>
+            <strong>Sharpe Ratio = Excess Return ÷ Risk Taken</strong>
+        </div>
+
+        <h2>📊 Understanding Your Sharpe Ratio of -5.98</h2>
+
+        <div class="warning-box">
+            <h3>⚠️ What -5.98 Means:</h3>
+            <ul>
+                <li><strong>Negative Value:</strong> Your portfolio is currently losing money relative to the risk taken</li>
+                <li><strong>Magnitude (-5.98):</strong> The losses are significant compared to the risk level</li>
+                <li><strong>Risk-Adjusted Performance:</strong> Poor - you're not being compensated for the risk</li>
+            </ul>
+        </div>
+
+        <h3>Interpretation Scale:</h3>
+        <table class="comparison-table">
+            <thead>
+                <tr>
+                    <th>Sharpe Ratio Range</th>
+                    <th>Performance Level</th>
+                    <th>Interpretation</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr style="background: #d4edda;">
+                    <td>> 2.0</td>
+                    <td>Excellent</td>
+                    <td>Outstanding risk-adjusted returns</td>
+                </tr>
+                <tr style="background: #d4edda;">
+                    <td>1.0 to 2.0</td>
+                    <td>Good</td>
+                    <td>Attractive risk-adjusted returns</td>
+                </tr>
+                <tr style="background: #fff3cd;">
+                    <td>0.0 to 1.0</td>
+                    <td>Adequate</td>
+                    <td>Positive but modest risk-adjusted returns</td>
+                </tr>
+                <tr style="background: #fff3cd;">
+                    <td>-1.0 to 0.0</td>
+                    <td>Poor</td>
+                    <td>Negative returns but manageable</td>
+                </tr>
+                <tr style="background: #f8d7da;">
+                    <td>< -1.0</td>
+                    <td>Very Poor</td>
+                    <td>Significant losses relative to risk</td>
+                </tr>
+                <tr style="background: #f8d7da; font-weight: bold;">
+                    <td>-5.98 (Your Portfolio)</td>
+                    <td>Concerning</td>
+                    <td>Substantial losses need attention</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>🔍 Why is Your Sharpe Ratio Negative?</h2>
+
+        <div class="explanation-box">
+            <h3>Possible Reasons for -5.98:</h3>
+            <ol>
+                <li><strong>Market Timing:</strong> Contracts may have been entered at unfavorable rates</li>
+                <li><strong>Currency Volatility:</strong> Adverse movements in EUR/INR or other currency pairs</li>
+                <li><strong>Hedge Timing:</strong> Forward contracts may be experiencing temporary mark-to-market losses</li>
+                <li><strong>Portfolio Composition:</strong> High exposure to currently unfavorable currency positions</li>
+            </ol>
+        </div>
+
+        <h2>💡 What This Means for Your Business</h2>
+
+        <div class="key-point">
+            <h3>Key Takeaways:</h3>
+            <ul>
+                <li><strong>Not a Panic Signal:</strong> This is a temporary performance measure, not a prediction of future results</li>
+                <li><strong>Risk-Adjusted View:</strong> While there are losses, the ratio accounts for the risk level of your strategy</li>
+                <li><strong>Hedging Purpose:</strong> Remember, these forwards are primarily for <strong>risk management</strong>, not speculation</li>
+                <li><strong>Time Horizon:</strong> Forward contracts are designed to protect against currency risk over time</li>
+            </ul>
+        </div>
+
+        <h2>📈 Improving the Sharpe Ratio</h2>
+
+        <div class="explanation-box">
+            <h3>Potential Strategies:</h3>
+            <ol>
+                <li><strong>Diversification:</strong> Spread exposure across multiple currency pairs</li>
+                <li><strong>Timing Optimization:</strong> Consider market conditions when entering new contracts</li>
+                <li><strong>Risk Management:</strong> Implement stop-loss or profit-taking strategies</li>
+                <li><strong>Portfolio Rebalancing:</strong> Adjust position sizes based on market conditions</li>
+                <li><strong>Hedging Efficiency:</strong> Optimize hedge ratios to match underlying exposures</li>
+            </ol>
+        </div>
+
+        <h2>🎯 Client Recommendations</h2>
+
+        <div class="client-summary">
+            <h3>Executive Summary:</h3>
+            
+            <p><strong>Current Situation:</strong> Your portfolio's Sharpe Ratio of -5.98 indicates that your currency forward contracts are currently experiencing losses relative to the risk being taken.</p>
+            
+            <p><strong>Context:</strong> This is a short-term performance measure. Currency forwards are primarily risk management tools, not profit-generating investments.</p>
+            
+            <p><strong>Recommendation:</strong></p>
+            <ul>
+                <li><strong>Monitor:</strong> Keep tracking but don't make hasty decisions</li>
+                <li><strong>Review:</strong> Assess if current hedging strategy aligns with business needs</li>
+                <li><strong>Optimize:</strong> Consider adjusting future contract timing and sizing</li>
+                <li><strong>Focus:</strong> Remember the primary goal is currency risk protection, not profit maximization</li>
+            </ul>
+        </div>
+
+        <h2>📋 Action Items</h2>
+
+        <div class="good-box">
+            <h3>Immediate Steps:</h3>
+            <ol>
+                <li><strong>Review Individual Contracts:</strong> Identify which currency pairs are contributing most to the negative ratio</li>
+                <li><strong>Assess Market Conditions:</strong> Understand current currency market trends</li>
+                <li><strong>Evaluate Hedge Effectiveness:</strong> Ensure forwards are properly hedging underlying exposures</li>
+                <li><strong>Consider Adjustments:</strong> Review upcoming contract maturities and renewal strategies</li>
+            </ol>
+        </div>
+
+        <div class="warning-box">
+            <h3>Important Note:</h3>
+            <p><strong>The Sharpe Ratio is just one metric.</strong> For currency hedging, the primary success measure should be how well your forwards are protecting against currency risk, not just their standalone profitability.</p>
+        </div>
+
+        <div style="text-align: center; margin-top: 30px; color: #7f8c8d;">
+            <p>Analysis Date: July 9, 2025</p>
+            <p>Current Sharpe Ratio: -5.98</p>
+            <p>Status: ⚠️ <strong>REQUIRES MONITORING</strong></p>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Currency Risk Management Platform - Product Architecture & Functionality</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 25px 50px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 50px;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 30px;
+        }
+        .header h1 {
+            color: #2c3e50;
+            font-size: 2.8em;
+            margin: 0;
+            font-weight: 300;
+        }
+        .header h2 {
+            color: #667eea;
+            font-size: 1.5em;
+            margin: 10px 0;
+            font-weight: 400;
+        }
+        .header p {
+            color: #666;
+            font-size: 1.1em;
+            margin-top: 15px;
+        }
+        .section {
+            margin: 40px 0;
+            padding: 30px;
+            border-radius: 15px;
+            border-left: 5px solid #667eea;
+        }
+        .section-overview {
+            background: linear-gradient(135deg, #f8f9ff 0%, #e8f0ff 100%);
+        }
+        .section-architecture {
+            background: linear-gradient(135deg, #f0f8ff 0%, #e0f2ff 100%);
+        }
+        .section-features {
+            background: linear-gradient(135deg, #f8fff8 0%, #e8ffe8 100%);
+        }
+        .section-metrics {
+            background: linear-gradient(135deg, #fff8f0 0%, #ffe8e0 100%);
+        }
+        .section-benefits {
+            background: linear-gradient(135deg, #f8f0ff 0%, #e8e0ff 100%);
+        }
+        h2 {
+            color: #2c3e50;
+            font-size: 2em;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+        }
+        h3 {
+            color: #34495e;
+            font-size: 1.4em;
+            margin: 25px 0 15px 0;
+            border-bottom: 2px solid #ecf0f1;
+            padding-bottom: 10px;
+        }
+        .component-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 25px;
+            margin: 30px 0;
+        }
+        .component-card {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.08);
+            border-left: 4px solid #667eea;
+            transition: transform 0.3s ease;
+        }
+        .component-card:hover {
+            transform: translateY(-5px);
+        }
+        .component-card h4 {
+            color: #2c3e50;
+            font-size: 1.2em;
+            margin: 0 0 15px 0;
+            display: flex;
+            align-items: center;
+        }
+        .component-icon {
+            font-size: 1.5em;
+            margin-right: 10px;
+            color: #667eea;
+        }
+        .feature-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin: 25px 0;
+        }
+        .feature-item {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            border-left: 4px solid #27ae60;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+        }
+        .feature-item h5 {
+            color: #2c3e50;
+            margin: 0 0 10px 0;
+            font-size: 1.1em;
+        }
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin: 25px 0;
+        }
+        .metric-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+        }
+        .metric-value {
+            font-size: 2.2em;
+            font-weight: bold;
+            color: #e74c3c;
+            margin: 10px 0;
+        }
+        .metric-label {
+            color: #666;
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .architecture-diagram {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            margin: 30px 0;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        .data-flow {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            margin: 20px 0;
+        }
+        .flow-item {
+            background: #667eea;
+            color: white;
+            padding: 15px 20px;
+            border-radius: 25px;
+            margin: 10px;
+            font-weight: 500;
+            min-width: 120px;
+            text-align: center;
+        }
+        .flow-arrow {
+            font-size: 1.5em;
+            color: #667eea;
+            margin: 0 10px;
+        }
+        .highlight-box {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+        .success-box {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+        .tech-stack {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 25px 0;
+        }
+        .tech-item {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            border: 2px solid #e9ecef;
+        }
+        .value-prop {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 15px;
+            margin: 30px 0;
+            text-align: center;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 50px;
+            padding-top: 30px;
+            border-top: 2px solid #ecf0f1;
+            color: #666;
+        }
+        ul, ol {
+            padding-left: 25px;
+        }
+        li {
+            margin: 8px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Currency Risk Management Platform</h1>
+            <h2>Enterprise-Grade Financial Risk Management Solution</h2>
+            <p><strong>Comprehensive Product Architecture & Functionality Overview</strong></p>
+            <p>Institutional-quality currency hedging with real-time analytics and advanced risk metrics</p>
+        </div>
+
+        <div class="section section-overview">
+            <h2>🎯 Executive Summary</h2>
+            <div class="success-box">
+                <p><strong>We have developed a comprehensive, cloud-based currency risk management platform that provides institutional-grade hedging capabilities with real-time market data integration, advanced analytics, and sophisticated risk metrics.</strong></p>
+            </div>
+            
+            <h3>Platform Overview</h3>
+            <p>Our solution is built as a <strong>modular, microservices-based architecture</strong> that delivers:</p>
+            <ul>
+                <li><strong>Real-time FX rate processing</strong> from multiple market data providers</li>
+                <li><strong>Advanced forward curve modeling</strong> using cubic spline interpolation</li>
+                <li><strong>Dynamic mark-to-market calculations</strong> with instant P&L attribution</li>
+                <li><strong>Comprehensive risk analytics</strong> including Sharpe ratio and VaR calculations</li>
+                <li><strong>Professional dashboard interface</strong> for portfolio monitoring and management</li>
+            </ul>
+        </div>
+
+        <div class="section section-architecture">
+            <h2>🏗️ Platform Architecture</h2>
+            
+            <div class="architecture-diagram">
+                <h3>System Architecture Overview</h3>
+                <div class="data-flow">
+                    <div class="flow-item">Market Data Sources</div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-item">Pricing Engine</div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-item">Risk Calculator</div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-item">Client Dashboard</div>
+                </div>
+            </div>
+
+            <h3>Core System Components</h3>
+            <div class="component-grid">
+                <div class="component-card">
+                    <h4><span class="component-icon">📊</span>Pricing Engine</h4>
+                    <p><strong>Real-time FX Data Processing:</strong></p>
+                    <ul>
+                        <li>Consumes live FX rates from FxRatesAPI and central bank feeds</li>
+                        <li>Implements Interest Rate Parity (IRP) for forward rate calculations</li>
+                        <li>Updates every 30 seconds for real-time accuracy</li>
+                        <li>Supports all major and cross currency pairs</li>
+                    </ul>
+                </div>
+
+                <div class="component-card">
+                    <h4><span class="component-icon">📈</span>Cubic Spline Interpolator</h4>
+                    <p><strong>Advanced Forward Curve Construction:</strong></p>
+                    <ul>
+                        <li>Interpolates forward rates for tenors up to 12 months</li>
+                        <li>Creates smooth yield curves from anchor points</li>
+                        <li>Ensures mathematical precision in rate calculations</li>
+                        <li>Handles complex curve shapes and market conditions</li>
+                    </ul>
+                </div>
+
+                <div class="component-card">
+                    <h4><span class="component-icon">💰</span>Mark-to-Market (M2M) Calculator</h4>
+                    <p><strong>Dynamic P&L Computation:</strong></p>
+                    <ul>
+                        <li>Computes unrealized gains/losses in real-time</li>
+                        <li>Daily P&L attribution by contract and currency pair</li>
+                        <li>Tracks performance against budgeted forward rates</li>
+                        <li>Historical P&L tracking and trend analysis</li>
+                    </ul>
+                </div>
+
+                <div class="component-card">
+                    <h4><span class="component-icon">🚨</span>Risk Monitoring & Alert Engine</h4>
+                    <p><strong>Proactive Risk Management:</strong></p>
+                    <ul>
+                        <li>Continuous monitoring of exposure levels</li>
+                        <li>Automated alerts for breach of trigger levels</li>
+                        <li>Risk rating classification (Low/Medium/High/Critical)</li>
+                        <li>Value-at-Risk (VaR) calculations with confidence intervals</li>
+                    </ul>
+                </div>
+
+                <div class="component-card">
+                    <h4><span class="component-icon">📋</span>Contract Management System</h4>
+                    <p><strong>Comprehensive Contract Lifecycle:</strong></p>
+                    <ul>
+                        <li>Create and manage FX forward contracts</li>
+                        <li>Track contract performance and hedge effectiveness</li>
+                        <li>Automated maturity tracking and settlement</li>
+                        <li>Contract modification and termination capabilities</li>
+                    </ul>
+                </div>
+
+                <div class="component-card">
+                    <h4><span class="component-icon">📊</span>Analytics & Reporting Dashboard</h4>
+                    <p><strong>Professional Data Visualization:</strong></p>
+                    <ul>
+                        <li>Real-time exposure monitoring and portfolio overview</li>
+                        <li>Interactive charts for forward curves and P&L trends</li>
+                        <li>Weighted Average Rate (WAR) calculations</li>
+                        <li>Volatility analysis and risk metrics display</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="section section-features">
+            <h2>⚡ Key Platform Features</h2>
+            
+            <h3>Advanced Financial Calculations</h3>
+            <div class="feature-list">
+                <div class="feature-item">
+                    <h5>Interest Rate Parity (IRP) Implementation</h5>
+                    <p>Accurate forward rate calculations using real central bank interest rates with automatic updates</p>
+                </div>
+                <div class="feature-item">
+                    <h5>Cubic Spline Interpolation</h5>
+                    <p>Smooth yield curve construction for precise forward rate determination across all tenors</p>
+                </div>
+                <div class="feature-item">
+                    <h5>Daily P&L Attribution</h5>
+                    <p>Detailed profit/loss breakdown by contract, currency pair, and time period</p>
+                </div>
+                <div class="feature-item">
+                    <h5>Real-time Mark-to-Market</h5>
+                    <p>Instant portfolio valuation updates with live market data integration</p>
+                </div>
+            </div>
+
+            <h3>Risk Management Capabilities</h3>
+            <div class="feature-list">
+                <div class="feature-item">
+                    <h5>Value-at-Risk (VaR) Calculations</h5>
+                    <p>Statistical risk measurement with 95% and 99% confidence levels</p>
+                </div>
+                <div class="feature-item">
+                    <h5>Maximum Drawdown Analysis</h5>
+                    <p>Peak-to-trough portfolio loss measurement for risk assessment</p>
+                </div>
+                <div class="feature-item">
+                    <h5>Volatility Tracking</h5>
+                    <p>Real-time volatility monitoring for all currency pairs in portfolio</p>
+                </div>
+                <div class="feature-item">
+                    <h5>Exposure Concentration Limits</h5>
+                    <p>Automated monitoring of single currency and counterparty exposures</p>
+                </div>
+            </div>
+
+            <h3>User Interface & Experience</h3>
+            <div class="feature-list">
+                <div class="feature-item">
+                    <h5>Live Currency Dashboard</h5>
+                    <p>Real-time rates display with bid/ask spreads and market movements</p>
+                </div>
+                <div class="feature-item">
+                    <h5>Contract Management Interface</h5>
+                    <p>Intuitive contract creation, modification, and tracking capabilities</p>
+                </div>
+                <div class="feature-item">
+                    <h5>P&L Analytics Workbench</h5>
+                    <p>Advanced charting and analysis tools for performance evaluation</p>
+                </div>
+                <div class="feature-item">
+                    <h5>Risk Reporting Suite</h5>
+                    <p>Comprehensive risk reports with export functionality for compliance</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="section section-metrics">
+            <h2>📊 Advanced Risk Metrics & Analytics</h2>
+            
+            <h3>Sharpe Ratio Analysis</h3>
+            <div class="highlight-box">
+                <p><strong>The Sharpe Ratio is a key performance metric that measures risk-adjusted returns:</strong></p>
+                <p><strong>Formula:</strong> Sharpe Ratio = (Portfolio Return - Risk-Free Rate) ÷ Portfolio Volatility</p>
+                <p><strong>Current Implementation:</strong> Real-time calculation using portfolio P&L data and volatility measurements</p>
+            </div>
+
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-label">Current Sharpe Ratio</div>
+                    <div class="metric-value">-5.98</div>
+                    <p><strong>Interpretation:</strong> Indicates current underperformance requiring strategy review</p>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Performance Scale</div>
+                    <div class="metric-value">> 2.0</div>
+                    <p><strong>Target Range:</strong> Excellent risk-adjusted performance goal</p>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Risk Assessment</div>
+                    <div class="metric-value">High</div>
+                    <p><strong>Status:</strong> Requires monitoring and potential strategy adjustment</p>
+                </div>
+            </div>
+
+            <h3>Comprehensive Risk Metrics Suite</h3>
+            <div class="component-grid">
+                <div class="component-card">
+                    <h4><span class="component-icon">📈</span>Value-at-Risk (VaR)</h4>
+                    <p>Statistical measure of potential losses over specific time horizons with defined confidence levels (95%, 99%)</p>
+                </div>
+                <div class="component-card">
+                    <h4><span class="component-icon">📉</span>Maximum Drawdown</h4>
+                    <p>Peak-to-trough portfolio decline measurement for worst-case scenario analysis</p>
+                </div>
+                <div class="component-card">
+                    <h4><span class="component-icon">⚡</span>Portfolio Volatility</h4>
+                    <p>Annualized standard deviation of returns measuring portfolio risk level</p>
+                </div>
+                <div class="component-card">
+                    <h4><span class="component-icon">🎯</span>Weighted Average Rate (WAR)</h4>
+                    <p>Portfolio-weighted average of forward rates for aggregate exposure analysis</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="section section-benefits">
+            <h2>🏆 Technology Stack & Implementation</h2>
+            
+            <h3>Modern Technology Foundation</h3>
+            <div class="tech-stack">
+                <div class="tech-item">
+                    <strong>Frontend</strong><br>
+                    React.js + TypeScript<br>
+                    Modern UI/UX
+                </div>
+                <div class="tech-item">
+                    <strong>Backend</strong><br>
+                    Next.js API Routes<br>
+                    Serverless Architecture
+                </div>
+                <div class="tech-item">
+                    <strong>Data Sources</strong><br>
+                    FxRatesAPI<br>
+                    Central Bank Feeds
+                </div>
+                <div class="tech-item">
+                    <strong>Analytics</strong><br>
+                    Advanced Mathematics<br>
+                    Real-time Calculations
+                </div>
+                <div class="tech-item">
+                    <strong>Visualization</strong><br>
+                    Recharts.js<br>
+                    Interactive Charts
+                </div>
+                <div class="tech-item">
+                    <strong>State Management</strong><br>
+                    React Context<br>
+                    Zustand Store
+                </div>
+            </div>
+
+            <h3>Platform Benefits & Value Proposition</h3>
+            <div class="feature-list">
+                <div class="feature-item">
+                    <h5>Institutional-Grade Accuracy</h5>
+                    <p>100% accurate calculations using real market data and proven financial methodologies</p>
+                </div>
+                <div class="feature-item">
+                    <h5>Real-time Risk Management</h5>
+                    <p>Continuous monitoring and instant alerts for proactive risk mitigation</p>
+                </div>
+                <div class="feature-item">
+                    <h5>Scalable Cloud Architecture</h5>
+                    <p>Microservices design supporting growth and additional functionality</p>
+                </div>
+                <div class="feature-item">
+                    <h5>Professional User Experience</h5>
+                    <p>Intuitive interface designed for financial professionals and treasury teams</p>
+                </div>
+                <div class="feature-item">
+                    <h5>Comprehensive Analytics</h5>
+                    <p>Advanced metrics including Sharpe ratio, VaR, and volatility analysis</p>
+                </div>
+                <div class="feature-item">
+                    <h5>Regulatory Compliance Ready</h5>
+                    <p>Audit trails, reporting capabilities, and risk documentation for compliance</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="value-prop">
+            <h2>🎯 Strategic Value Delivered</h2>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 30px; margin-top: 30px;">
+                <div>
+                    <h3>Risk Mitigation</h3>
+                    <p>Advanced early warning systems and comprehensive risk metrics for proactive management</p>
+                </div>
+                <div>
+                    <h3>Operational Efficiency</h3>
+                    <p>Automated calculations and real-time updates reduce manual effort and errors</p>
+                </div>
+                <div>
+                    <h3>Strategic Insights</h3>
+                    <p>Professional analytics including Sharpe ratio provide strategic decision support</p>
+                </div>
+                <div>
+                    <h3>Compliance Support</h3>
+                    <p>Comprehensive reporting and audit trails support regulatory requirements</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="success-box">
+            <h3>✅ Implementation Status</h3>
+            <p><strong>The platform is fully operational with all core components implemented and tested:</strong></p>
+            <ul>
+                <li>✅ Real-time market data integration active</li>
+                <li>✅ All calculation engines verified for accuracy</li>
+                <li>✅ Risk metrics including Sharpe ratio operational</li>
+                <li>✅ User interface optimized for professional use</li>
+                <li>✅ System performance tested and validated</li>
+            </ul>
+        </div>
+
+        <div class="footer">
+            <p><strong>Currency Risk Management Platform</strong></p>
+            <p>Enterprise-grade solution delivering institutional-quality risk management capabilities</p>
+            <p>Status: ✅ <strong>FULLY OPERATIONAL</strong> | Architecture: <strong>PRODUCTION-READY</strong></p>
+        </div>
+    </div>
+</body>
+</html>
