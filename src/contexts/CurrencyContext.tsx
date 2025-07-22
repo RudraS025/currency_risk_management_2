@@ -71,87 +71,193 @@ type CurrencyAction =
   | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'SET_LAST_UPDATED'; payload: Date }
 
-const initialState: CurrencyState = {
-  contracts: [
-    // Sample contracts for demonstration
-    {
-      id: '1',
-      contractDate: new Date('2024-12-01'),
-      maturityDate: new Date('2025-03-15'),
-      currencyPair: 'USD/INR',
-      amount: 100000,
-      contractType: 'export',
-      budgetedForwardRate: 85.20,
-      currentForwardRate: 85.45,
-      spotRate: 85.45,
-      pnl: 2500,
-      status: 'active',
-      description: 'Export Contract - Technology Services'
-    },
-    {
-      id: '2',
-      contractDate: new Date('2024-11-15'),
-      maturityDate: new Date('2025-02-28'),
-      currencyPair: 'EUR/INR',
-      amount: 75000,
-      contractType: 'import',
-      budgetedForwardRate: 98.50,
-      currentForwardRate: 100.75,
-      spotRate: 100.75,
-      pnl: -1687.50,
-      status: 'active',
-      description: 'Import Contract - Machinery Purchase'
-    },
-    {
-      id: '3',
-      contractDate: new Date('2024-10-20'),
-      maturityDate: new Date('2025-04-30'),
-      currencyPair: 'GBP/INR',
-      amount: 50000,
-      contractType: 'forward',
-      budgetedForwardRate: 112.30,
-      currentForwardRate: 116.55,
-      spotRate: 116.55,
-      pnl: 2125,
-      status: 'active',
-      description: 'Forward Hedge - Consultancy Income'
+// Storage keys
+const STORAGE_KEYS = {
+  CONTRACTS: 'currency_risk_contracts',
+  RATES: 'currency_risk_rates',
+  INTEREST_RATES: 'currency_risk_interest_rates',
+  LAST_UPDATED: 'currency_risk_last_updated',
+  FIRST_LOAD: 'currency_risk_first_load'
+}
+
+// Demo contracts - only loaded on first visit
+const DEMO_CONTRACTS: Contract[] = [
+  {
+    id: 'demo-1',
+    contractDate: new Date('2024-12-01'),
+    maturityDate: new Date('2025-03-15'),
+    currencyPair: 'USD/INR',
+    amount: 100000,
+    contractType: 'export',
+    budgetedForwardRate: 85.20,
+    currentForwardRate: 85.45,
+    spotRate: 85.45,
+    pnl: 2500,
+    status: 'active',
+    description: 'Export Contract - Technology Services (Demo)',
+    inceptionDate: new Date('2024-12-01'),
+    inceptionSpotRate: 85.15
+  },
+  {
+    id: 'demo-2',
+    contractDate: new Date('2024-11-15'),
+    maturityDate: new Date('2025-02-28'),
+    currencyPair: 'EUR/INR',
+    amount: 75000,
+    contractType: 'import',
+    budgetedForwardRate: 98.50,
+    currentForwardRate: 100.75,
+    spotRate: 100.75,
+    pnl: -1687.50,
+    status: 'active',
+    description: 'Import Contract - Machinery Purchase (Demo)',
+    inceptionDate: new Date('2024-11-15'),
+    inceptionSpotRate: 98.30
+  },
+  {
+    id: 'demo-3',
+    contractDate: new Date('2024-10-20'),
+    maturityDate: new Date('2025-04-30'),
+    currencyPair: 'GBP/INR',
+    amount: 50000,
+    contractType: 'forward',
+    budgetedForwardRate: 112.30,
+    currentForwardRate: 116.55,
+    spotRate: 116.55,
+    pnl: 2125,
+    status: 'active',
+    description: 'Forward Hedge - Consultancy Income (Demo)',
+    inceptionDate: new Date('2024-10-20'),
+    inceptionSpotRate: 112.10
+  }
+]
+
+// Load data from localStorage
+const loadFromStorage = (key: string, defaultValue: any) => {
+  if (typeof window === 'undefined') return defaultValue
+  
+  try {
+    const stored = localStorage.getItem(key)
+    if (!stored) return defaultValue
+    
+    const parsed = JSON.parse(stored)
+    
+    // Handle Date objects in contracts
+    if (key === STORAGE_KEYS.CONTRACTS && Array.isArray(parsed)) {
+      return parsed.map((contract: any) => ({
+        ...contract,
+        contractDate: new Date(contract.contractDate),
+        maturityDate: new Date(contract.maturityDate),
+        inceptionDate: contract.inceptionDate ? new Date(contract.inceptionDate) : undefined,
+        lastUpdateDate: contract.lastUpdateDate ? new Date(contract.lastUpdateDate) : undefined
+      }))
     }
-  ],
-  currencyRates: [],
-  interestRates: [],
-  isLoading: false,
-  lastUpdated: null,
+    
+    // Handle Date objects in interest rates
+    if (key === STORAGE_KEYS.INTEREST_RATES && Array.isArray(parsed)) {
+      return parsed.map((rate: any) => ({
+        ...rate,
+        lastUpdated: new Date(rate.lastUpdated)
+      }))
+    }
+    
+    // Handle last updated date
+    if (key === STORAGE_KEYS.LAST_UPDATED && parsed) {
+      return new Date(parsed)
+    }
+    
+    return parsed
+  } catch (error) {
+    console.error(`Error loading ${key} from localStorage:`, error)
+    return defaultValue
+  }
+}
+
+// Save data to localStorage
+const saveToStorage = (key: string, data: any) => {
+  if (typeof window === 'undefined') return
+  
+  try {
+    localStorage.setItem(key, JSON.stringify(data))
+  } catch (error) {
+    console.error(`Error saving ${key} to localStorage:`, error)
+  }
+}
+
+// Check if this is the first load
+const isFirstLoad = () => {
+  if (typeof window === 'undefined') return false
+  return !localStorage.getItem(STORAGE_KEYS.FIRST_LOAD)
+}
+
+// Mark as not first load
+const markAsLoaded = () => {
+  if (typeof window === 'undefined') return
+  localStorage.setItem(STORAGE_KEYS.FIRST_LOAD, 'true')
+}
+
+const getInitialState = (): CurrencyState => {
+  // Load saved contracts or use demo contracts on first load
+  const savedContracts = loadFromStorage(STORAGE_KEYS.CONTRACTS, [])
+  const contracts = savedContracts.length > 0 ? savedContracts : (isFirstLoad() ? DEMO_CONTRACTS : [])
+  
+  return {
+    contracts,
+    currencyRates: loadFromStorage(STORAGE_KEYS.RATES, []),
+    interestRates: loadFromStorage(STORAGE_KEYS.INTEREST_RATES, []),
+    isLoading: false,
+    lastUpdated: loadFromStorage(STORAGE_KEYS.LAST_UPDATED, null),
+  }
 }
 
 function currencyReducer(state: CurrencyState, action: CurrencyAction): CurrencyState {
+  let newState: CurrencyState
+  
   switch (action.type) {
     case 'SET_CONTRACTS':
-      return { ...state, contracts: action.payload }
+      newState = { ...state, contracts: action.payload }
+      saveToStorage(STORAGE_KEYS.CONTRACTS, action.payload)
+      break
     case 'ADD_CONTRACT':
-      return { ...state, contracts: [...state.contracts, action.payload] }
+      newState = { ...state, contracts: [...state.contracts, action.payload] }
+      saveToStorage(STORAGE_KEYS.CONTRACTS, newState.contracts)
+      break
     case 'UPDATE_CONTRACT':
-      return {
+      newState = {
         ...state,
         contracts: state.contracts.map(contract =>
           contract.id === action.payload.id ? action.payload : contract
         ),
       }
+      saveToStorage(STORAGE_KEYS.CONTRACTS, newState.contracts)
+      break
     case 'DELETE_CONTRACT':
-      return {
+      newState = {
         ...state,
         contracts: state.contracts.filter(contract => contract.id !== action.payload),
       }
+      saveToStorage(STORAGE_KEYS.CONTRACTS, newState.contracts)
+      break
     case 'SET_CURRENCY_RATES':
-      return { ...state, currencyRates: action.payload }
+      newState = { ...state, currencyRates: action.payload }
+      saveToStorage(STORAGE_KEYS.RATES, action.payload)
+      break
     case 'SET_INTEREST_RATES':
-      return { ...state, interestRates: action.payload }
+      newState = { ...state, interestRates: action.payload }
+      saveToStorage(STORAGE_KEYS.INTEREST_RATES, action.payload)
+      break
     case 'SET_LOADING':
-      return { ...state, isLoading: action.payload }
+      newState = { ...state, isLoading: action.payload }
+      break
     case 'SET_LAST_UPDATED':
-      return { ...state, lastUpdated: action.payload }
+      newState = { ...state, lastUpdated: action.payload }
+      saveToStorage(STORAGE_KEYS.LAST_UPDATED, action.payload)
+      break
     default:
       return state
   }
+  
+  return newState
 }
 
 interface CurrencyContextType {
@@ -160,6 +266,8 @@ interface CurrencyContextType {
   updateContract: (contract: Contract) => void
   deleteContract: (id: string) => void
   refreshRates: (showToast?: boolean) => Promise<void>
+  clearAllContracts: () => void
+  loadDemoContracts: () => void
   // New world-class functions
   initializeContractWithLiveRate: (contractData: Omit<Contract, 'id' | 'budgetedForwardRate' | 'inceptionSpotRate' | 'inceptionDate'>) => Promise<void>
   recalculateContractPnL: (contractId: string) => Promise<void>
@@ -169,15 +277,22 @@ interface CurrencyContextType {
 const CurrencyContext = createContext<CurrencyContextType | undefined>(undefined)
 
 export function CurrencyProvider({ children }: { children: React.ReactNode }) {
-  const [state, dispatch] = useReducer(currencyReducer, initialState)
+  const [state, dispatch] = useReducer(currencyReducer, getInitialState())
+
+  // Mark as loaded on first render
+  useEffect(() => {
+    if (isFirstLoad()) {
+      markAsLoaded()
+    }
+  }, [])
 
   const addContract = (contractData: Omit<Contract, 'id'>) => {
     const contract: Contract = {
       ...contractData,
-      id: Date.now().toString(),
+      id: `contract_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
     }
     dispatch({ type: 'ADD_CONTRACT', payload: contract })
-    toast.success('Contract created successfully')
+    toast.success('Contract created successfully and saved!')
   }
 
   const updateContract = (contract: Contract) => {
@@ -188,6 +303,16 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
   const deleteContract = (id: string) => {
     dispatch({ type: 'DELETE_CONTRACT', payload: id })
     toast.success('Contract deleted successfully')
+  }
+
+  const clearAllContracts = () => {
+    dispatch({ type: 'SET_CONTRACTS', payload: [] })
+    toast.success('All contracts cleared!')
+  }
+
+  const loadDemoContracts = () => {
+    dispatch({ type: 'SET_CONTRACTS', payload: DEMO_CONTRACTS })
+    toast.success('Demo contracts loaded!')
   }
 
   const refreshRates = useCallback(async (showToast: boolean = false) => {
@@ -407,6 +532,8 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
         addContract,
         updateContract,
         deleteContract,
+        clearAllContracts,
+        loadDemoContracts,
         refreshRates,
         initializeContractWithLiveRate,
         recalculateContractPnL,

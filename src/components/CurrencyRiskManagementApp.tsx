@@ -5,6 +5,7 @@ import LiveCurrencyDashboard from '@/components/LiveCurrencyDashboard'
 import ContractManagement from '@/components/ContractManagement'
 import PnLAnalytics from '@/components/PnLAnalytics'
 import RiskReporting from '@/components/RiskReporting'
+import { DataManagement } from '@/components/DataManagement'
 import { CurrencyProvider } from '@/contexts/CurrencyContext'
 import { Toaster } from 'react-hot-toast'
 
@@ -40,7 +41,7 @@ export default function CurrencyRiskManagementApp() {
 
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <Tabs defaultValue="dashboard" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:grid-cols-4">
+            <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:grid-cols-5">
               <TabsTrigger value="dashboard" className="text-sm font-medium">
                 Live Dashboard
               </TabsTrigger>
@@ -52,6 +53,9 @@ export default function CurrencyRiskManagementApp() {
               </TabsTrigger>
               <TabsTrigger value="reporting" className="text-sm font-medium">
                 Risk Reporting
+              </TabsTrigger>
+              <TabsTrigger value="data" className="text-sm font-medium">
+                Data Management
               </TabsTrigger>
             </TabsList>
 
@@ -69,6 +73,10 @@ export default function CurrencyRiskManagementApp() {
 
             <TabsContent value="reporting" className="space-y-6">
               <RiskReporting />
+            </TabsContent>
+
+            <TabsContent value="data" className="space-y-6">
+              <DataManagement />
             </TabsContent>
           </Tabs>
         </main>
