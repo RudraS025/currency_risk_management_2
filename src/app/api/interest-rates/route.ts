@@ -89,13 +89,23 @@ export async function GET() {
       lastUpdated: new Date().toISOString(),
     }))
 
-    return NextResponse.json(liveRates)
+    return NextResponse.json({
+      success: true,
+      rates: liveRates,
+      timestamp: new Date().toISOString(),
+      source: 'CENTRAL_BANKS'
+    })
 
   } catch (error) {
     console.error('Error fetching interest rates:', error)
     
     // Return static data if any error occurs
-    return NextResponse.json(interestRateSources)
+    return NextResponse.json({
+      success: true,
+      rates: interestRateSources,
+      timestamp: new Date().toISOString(),
+      source: 'FALLBACK_DATA'
+    })
   }
 }
 

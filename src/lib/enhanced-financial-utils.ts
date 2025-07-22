@@ -17,6 +17,63 @@ export const INTEREST_RATES = {
   INR: 0.0550  // 5.50% RBI Repo Rate (CORRECTED from 6.50%)
 } as const
 
+// CURRENCY VOLATILITY DATA (annualized) - for option pricing
+export const CURRENCY_VOLATILITIES = {
+  'USD/INR': 0.12, // 12% annual volatility
+  'EUR/INR': 0.14, // 14% annual volatility
+  'GBP/INR': 0.16, // 16% annual volatility
+  'JPY/INR': 0.13, // 13% annual volatility
+  'AUD/INR': 0.18, // 18% annual volatility
+  'CAD/INR': 0.15, // 15% annual volatility
+  'CHF/INR': 0.11, // 11% annual volatility
+  'CNY/INR': 0.09, // 9% annual volatility
+} as const
+
+// CONTRACT TYPE DEFINITIONS
+export type ContractType = 'export' | 'import' | 'forward' | 'spot' | 'swap' | 'option'
+export type OptionType = 'call' | 'put'
+export type SwapType = 'fixed-floating' | 'floating-floating' | 'fixed-fixed'
+
+export interface SpotTransactionDetails {
+  contractType: 'spot'
+  settlementDate: Date // T+2 for spot
+  settlementRate: number
+  settlementAmount: number
+  counterpartySpread: number
+  dealingSpread: number
+}
+
+export interface SwapContractDetails {
+  contractType: 'swap'
+  swapType: SwapType
+  notionalAmount: number
+  fixedRate?: number
+  floatingRateIndex?: string
+  paymentFrequency: 'monthly' | 'quarterly' | 'semi-annual' | 'annual'
+  resetFrequency: 'monthly' | 'quarterly' | 'semi-annual' | 'annual'
+  swapPoints: number
+  nearLegDate: Date
+  farLegDate: Date
+  nearLegRate: number
+  farLegRate: number
+}
+
+export interface OptionContractDetails {
+  contractType: 'option'
+  optionType: OptionType
+  strike: number
+  premium: number
+  volatility: number
+  timeToExpiry: number // in years
+  delta: number
+  gamma: number
+  vega: number
+  theta: number
+  rho: number
+  intrinsicValue: number
+  timeValue: number
+}
+
 export interface DailyPnLEntry {
   date: Date
   dayNumber: number
@@ -454,4 +511,268 @@ export function generateDailyPnLAnalysis(
     riskMetrics,
     cubicSplineAnchors: anchorsForDay2Plus
   }
+}
+
+/**
+ * SPOT TRANSACTION PRICING
+ * Immediate settlement (T+2) with dealing spreads
+ */
+export function calculateSpotTransaction(
+  currencyPair: string,
+  spotRate: number,
+  amount: number,
+  side: 'buy' | 'sell' = 'buy'
+): SpotTransactionDetails {
+  const dealingSpread = 0.0005 // 5 basis points typical institutional spread
+  const counterpartySpread = 0.0002 // 2 basis points counterparty spread
+  
+  const settlementRate = side === 'buy' 
+    ? spotRate * (1 + dealingSpread + counterpartySpread)
+    : spotRate * (1 - dealingSpread - counterpartySpread)
+  
+  const settlementDate = new Date()
+  settlementDate.setDate(settlementDate.getDate() + 2) // T+2 settlement
+  
+  return {
+    contractType: 'spot',
+    settlementDate,
+    settlementRate,
+    settlementAmount: amount * settlementRate,
+    counterpartySpread,
+    dealingSpread
+  }
+}
+
+/**
+ * CURRENCY SWAP PRICING
+ * FX Swap = Spot + Forward components
+ */
+export function calculateCurrencySwap(
+  currencyPair: string,
+  spotRate: number,
+  amount: number,
+  nearLegDays: number = 7,  // Near leg (typically spot or 1 week)
+  farLegDays: number = 90,  // Far leg (typically 1-3 months)
+  swapType: SwapType = 'fixed-floating'
+): SwapContractDetails {
+  const [baseCurrency, quoteCurrency] = currencyPair.split('/')
+  
+  // Calculate near and far leg rates using IRP
+  const nearLegRate = nearLegDays <= 2 
+    ? spotRate 
+    : calculateForwardRate(spotRate, baseCurrency, quoteCurrency, nearLegDays)
+  
+  const farLegRate = calculateForwardRate(spotRate, baseCurrency, quoteCurrency, farLegDays)
+  
+  // Swap points = Far leg - Near leg (in pips)
+  const swapPoints = (farLegRate - nearLegRate) * 10000
+  
+  const nearLegDate = new Date()
+  nearLegDate.setDate(nearLegDate.getDate() + nearLegDays)
+  
+  const farLegDate = new Date()
+  farLegDate.setDate(farLegDate.getDate() + farLegDays)
+  
+  return {
+    contractType: 'swap',
+    swapType,
+    notionalAmount: amount,
+    paymentFrequency: 'quarterly',
+    resetFrequency: 'quarterly',
+    swapPoints,
+    nearLegDate,
+    farLegDate,
+    nearLegRate,
+    farLegRate
+  }
+}
+
+/**
+ * BLACK-SCHOLES OPTION PRICING MODEL
+ * For currency options with Greeks calculation
+ */
+export function calculateCurrencyOption(
+  currencyPair: string,
+  spotRate: number,
+  strike: number,
+  timeToExpiry: number, // in years
+  optionType: OptionType = 'call',
+  amount: number = 100000
+): OptionContractDetails {
+  const volatility = CURRENCY_VOLATILITIES[currencyPair as keyof typeof CURRENCY_VOLATILITIES] || 0.15
+  const [baseCurrency, quoteCurrency] = currencyPair.split('/')
+  
+  const riskFreeRate = INTEREST_RATES[baseCurrency as keyof typeof INTEREST_RATES] || 0.05
+  const foreignRate = INTEREST_RATES[quoteCurrency as keyof typeof INTEREST_RATES] || 0.055
+  
+  // Black-Scholes formula components
+  const d1 = (Math.log(spotRate / strike) + (riskFreeRate - foreignRate + (volatility ** 2) / 2) * timeToExpiry) / 
+             (volatility * Math.sqrt(timeToExpiry))
+  const d2 = d1 - volatility * Math.sqrt(timeToExpiry)
+  
+  // Standard normal cumulative distribution function
+  const normCDF = (x: number): number => {
+    return 0.5 * (1 + erf(x / Math.sqrt(2)))
+  }
+  
+  // Error function approximation
+  const erf = (x: number): number => {
+    const a1 =  0.254829592
+    const a2 = -0.284496736
+    const a3 =  1.421413741
+    const a4 = -1.453152027
+    const a5 =  1.061405429
+    const p  =  0.3275911
+    
+    const sign = x >= 0 ? 1 : -1
+    x = Math.abs(x)
+    
+    const t = 1.0 / (1.0 + p * x)
+    const y = 1.0 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * Math.exp(-x * x)
+    
+    return sign * y
+  }
+  
+  // Calculate option premium
+  let premium: number
+  let delta: number
+  
+  if (optionType === 'call') {
+    premium = Math.exp(-foreignRate * timeToExpiry) * spotRate * normCDF(d1) - 
+              Math.exp(-riskFreeRate * timeToExpiry) * strike * normCDF(d2)
+    delta = Math.exp(-foreignRate * timeToExpiry) * normCDF(d1)
+  } else {
+    premium = Math.exp(-riskFreeRate * timeToExpiry) * strike * normCDF(-d2) - 
+              Math.exp(-foreignRate * timeToExpiry) * spotRate * normCDF(-d1)
+    delta = -Math.exp(-foreignRate * timeToExpiry) * normCDF(-d1)
+  }
+  
+  // Calculate Greeks
+  const phi = (1 / Math.sqrt(2 * Math.PI)) * Math.exp(-0.5 * d1 * d1) // Standard normal PDF
+  
+  const gamma = Math.exp(-foreignRate * timeToExpiry) * phi / (spotRate * volatility * Math.sqrt(timeToExpiry))
+  const vega = spotRate * Math.exp(-foreignRate * timeToExpiry) * phi * Math.sqrt(timeToExpiry) / 100
+  const theta = (-spotRate * Math.exp(-foreignRate * timeToExpiry) * phi * volatility) / (2 * Math.sqrt(timeToExpiry)) -
+                riskFreeRate * strike * Math.exp(-riskFreeRate * timeToExpiry) * normCDF(optionType === 'call' ? d2 : -d2) +
+                foreignRate * spotRate * Math.exp(-foreignRate * timeToExpiry) * normCDF(optionType === 'call' ? d1 : -d1)
+  const rho = timeToExpiry * strike * Math.exp(-riskFreeRate * timeToExpiry) * normCDF(optionType === 'call' ? d2 : -d2) / 100
+  
+  const intrinsicValue = optionType === 'call' 
+    ? Math.max(spotRate - strike, 0)
+    : Math.max(strike - spotRate, 0)
+  const timeValue = premium - intrinsicValue
+  
+  return {
+    contractType: 'option',
+    optionType,
+    strike,
+    premium: premium * amount, // Total premium for the notional amount
+    volatility,
+    timeToExpiry,
+    delta,
+    gamma,
+    vega,
+    theta: theta / 365, // Daily theta
+    rho,
+    intrinsicValue: intrinsicValue * amount,
+    timeValue: timeValue * amount
+  }
+}
+
+/**
+ * ENHANCED CONTRACT INITIALIZATION
+ * Supports all contract types with proper pricing
+ */
+export function initializeContract(
+  contractData: any,
+  liveRates: any[]
+): any {
+  const currencyRate = liveRates.find(rate => rate.pair === contractData.currencyPair)
+  if (!currencyRate) {
+    throw new Error(`Currency rate not found for ${contractData.currencyPair}`)
+  }
+  
+  const spotRate = currencyRate.spotRate
+  const contractType = contractData.contractType
+  
+  let enhancedContract = {
+    ...contractData,
+    spotRate,
+    inceptionSpotRate: spotRate,
+    inceptionDate: new Date(),
+    lastUpdateDate: new Date()
+  }
+  
+  switch (contractType) {
+    case 'spot':
+      const spotDetails = calculateSpotTransaction(
+        contractData.currencyPair,
+        spotRate,
+        contractData.amount
+      )
+      enhancedContract = {
+        ...enhancedContract,
+        budgetedForwardRate: spotDetails.settlementRate,
+        currentForwardRate: spotDetails.settlementRate,
+        spotDetails,
+        maturityDate: spotDetails.settlementDate
+      }
+      break
+      
+    case 'swap':
+      const maturityDate = new Date(contractData.maturityDate)
+      const swapDays = Math.floor((maturityDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
+      const swapDetails = calculateCurrencySwap(
+        contractData.currencyPair,
+        spotRate,
+        contractData.amount,
+        7, // Near leg: 1 week
+        swapDays // Far leg: days to maturity
+      )
+      enhancedContract = {
+        ...enhancedContract,
+        budgetedForwardRate: swapDetails.farLegRate,
+        currentForwardRate: swapDetails.farLegRate,
+        swapDetails
+      }
+      break
+      
+    case 'option':
+      const optionMaturityDate = new Date(contractData.maturityDate)
+      const timeToExpiry = (optionMaturityDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24 * 365)
+      const strikeRate = contractData.strikeRate || spotRate * 1.02 // Default 2% OTM
+      const optionDetails = calculateCurrencyOption(
+        contractData.currencyPair,
+        spotRate,
+        strikeRate,
+        timeToExpiry,
+        contractData.optionType || 'call',
+        contractData.amount
+      )
+      enhancedContract = {
+        ...enhancedContract,
+        budgetedForwardRate: optionDetails.strike,
+        currentForwardRate: spotRate,
+        strikeRate,
+        optionDetails
+      }
+      break
+      
+    default:
+      // Forward, Export, Import contracts (existing logic)
+      const daysToMaturity = Math.floor((contractData.maturityDate - contractData.contractDate) / (1000 * 60 * 60 * 24))
+      const forwardRate = calculateForwardRate(
+        spotRate,
+        contractData.currencyPair.split('/')[0],
+        contractData.currencyPair.split('/')[1],
+        daysToMaturity
+      )
+      enhancedContract = {
+        ...enhancedContract,
+        budgetedForwardRate: forwardRate,
+        currentForwardRate: forwardRate
+      }
+  }
+  
+  return enhancedContract
 }

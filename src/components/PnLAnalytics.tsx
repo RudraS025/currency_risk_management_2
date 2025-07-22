@@ -289,7 +289,7 @@ export default function PnLAnalytics() {
                   <p className="text-lg font-semibold">${selectedContract.amount.toLocaleString()}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600">Budgeted Rate</p>
+                  <p className="text-sm text-gray-600">Budgeted Rate (Inception)</p>
                   <p className="text-lg font-semibold font-mono">{selectedContract.budgetedForwardRate.toFixed(4)}</p>
                 </div>
                 <div>
@@ -385,8 +385,8 @@ export default function PnLAnalytics() {
                     <Tooltip 
                       formatter={(value: number | string, name: string) => [
                         typeof value === 'number' ? value.toFixed(4) : value,
-                        name === 'forwardRate' ? 'Forward Rate' :
-                        name === 'budgetedRate' ? 'Budgeted Rate' :
+                        name === 'forwardRate' ? 'Current Forward Rate' :
+                        name === 'budgetedRate' ? 'Budgeted Rate (Fixed)' :
                         name === 'spotRate' ? 'Spot Rate' : name
                       ]}
                     />

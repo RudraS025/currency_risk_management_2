@@ -3,6 +3,20 @@
 import React, { createContext, useContext, useReducer, useEffect, useCallback } from 'react'
 import { toast } from 'react-hot-toast'
 
+export interface HedgeUtilization {
+  id: string
+  utilizationDate: Date
+  amount: number
+  utilizationRate: number // Rate at which utilization happened
+  utilizationType: 'settlement' | 'delivery' | 'rollover' | 'partial_settlement'
+  description: string
+  invoiceNumber?: string // For export/import settlements
+  shipmentDetails?: string
+  realizationPnL: number // P&L realized from this utilization
+  documentsRequired: string[] // KYC/Trade documents
+  complianceStatus: 'pending' | 'approved' | 'rejected'
+}
+
 export interface Contract {
   id: string
   contractDate: Date
@@ -14,8 +28,19 @@ export interface Contract {
   currentForwardRate: number
   spotRate: number
   pnl: number
-  status: 'active' | 'closed' | 'matured'
+  status: 'active' | 'closed' | 'matured' | 'partially_utilized' | 'cancelled'
   description: string
+  
+  // HEDGE MANAGEMENT FIELDS
+  hedgeStatus: 'available' | 'fully_utilized' | 'partially_utilized' | 'cancelled' | 'expired'
+  totalAmount: number // Original contract amount
+  availableAmount: number // Remaining available for utilization
+  utilizedAmount: number // Total amount already utilized
+  utilizationHistory: HedgeUtilization[] // Track all utilizations
+  cancellationReason?: string // If cancelled, reason for cancellation
+  cancellationDate?: Date // When cancelled
+  cancellationPnL?: number // P&L at cancellation
+  
   // New fields for world-class implementation
   inceptionSpotRate?: number // Day 1 spot rate (for reference)
   inceptionDate?: Date // When budgeted forward was fixed
@@ -28,6 +53,20 @@ export interface Contract {
     valueAtRisk: number
     riskRating: 'Low' | 'Medium' | 'High' | 'Critical'
   }
+  // Enhanced contract type specific fields
+  spotDetails?: any // Spot transaction details
+  swapDetails?: any // Currency swap details
+  optionDetails?: any // Option contract details
+  strikeRate?: number // For options
+  optionType?: 'call' | 'put' // For options
+  premium?: number // For options
+  settlementDate?: Date // For spot transactions
+  settlementDays?: number // For spot transactions
+  nearLegDate?: Date // For swaps
+  farLegDate?: Date // For swaps
+  nearLegDays?: number // For swaps
+  farLegDays?: number // For swaps
+  swapPoints?: number // For swaps
 }
 
 export interface CurrencyRate {
@@ -39,18 +78,18 @@ export interface CurrencyRate {
   forwardRate365D: number
   change: number
   changePercent: number
+  lastUpdated: string
+  timestamp: string
   interestRateDifferential: number
   bid: number
   ask: number
-  timestamp: string
 }
 
 export interface InterestRate {
-  country: string
   currency: string
   rate: number
-  source: string
-  lastUpdated: Date
+  centralBank: string
+  lastUpdated: string
 }
 
 interface CurrencyState {
@@ -58,206 +97,333 @@ interface CurrencyState {
   currencyRates: CurrencyRate[]
   interestRates: InterestRate[]
   isLoading: boolean
-  lastUpdated: Date | null
+  lastUpdated?: Date
 }
 
-type CurrencyAction =
+type CurrencyAction = 
   | { type: 'SET_CONTRACTS'; payload: Contract[] }
   | { type: 'ADD_CONTRACT'; payload: Contract }
   | { type: 'UPDATE_CONTRACT'; payload: Contract }
   | { type: 'DELETE_CONTRACT'; payload: string }
+  | { type: 'CLEAR_CONTRACTS' }
   | { type: 'SET_CURRENCY_RATES'; payload: CurrencyRate[] }
   | { type: 'SET_INTEREST_RATES'; payload: InterestRate[] }
   | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'SET_LAST_UPDATED'; payload: Date }
+  // HEDGE MANAGEMENT ACTIONS
+  | { type: 'UTILIZE_HEDGE'; payload: { contractId: string; utilization: HedgeUtilization } }
+  | { type: 'CANCEL_HEDGE'; payload: { contractId: string; reason: string; cancellationPnL: number } }
+  | { type: 'ROLLOVER_HEDGE'; payload: { contractId: string; newMaturityDate: Date } }
 
-// Storage keys
-const STORAGE_KEYS = {
-  CONTRACTS: 'currency_risk_contracts',
-  RATES: 'currency_risk_rates',
-  INTEREST_RATES: 'currency_risk_interest_rates',
-  LAST_UPDATED: 'currency_risk_last_updated',
-  FIRST_LOAD: 'currency_risk_first_load'
+const getInitialState = (): CurrencyState => {
+  const contracts: Contract[] = []
+  const currencyRates: CurrencyRate[] = []
+  const interestRates: InterestRate[] = []
+  
+  return {
+    contracts,
+    currencyRates,
+    interestRates,
+    isLoading: false
+  }
 }
 
-// Demo contracts - only loaded on first visit
-const DEMO_CONTRACTS: Contract[] = [
-  {
-    id: 'demo-1',
-    contractDate: new Date('2024-12-01'),
-    maturityDate: new Date('2025-03-15'),
-    currencyPair: 'USD/INR',
-    amount: 100000,
-    contractType: 'export',
-    budgetedForwardRate: 85.20,
-    currentForwardRate: 85.45,
-    spotRate: 85.45,
-    pnl: 2500,
-    status: 'active',
-    description: 'Export Contract - Technology Services (Demo)',
-    inceptionDate: new Date('2024-12-01'),
-    inceptionSpotRate: 85.15
-  },
-  {
-    id: 'demo-2',
-    contractDate: new Date('2024-11-15'),
-    maturityDate: new Date('2025-02-28'),
-    currencyPair: 'EUR/INR',
-    amount: 75000,
-    contractType: 'import',
-    budgetedForwardRate: 98.50,
-    currentForwardRate: 100.75,
-    spotRate: 100.75,
-    pnl: -1687.50,
-    status: 'active',
-    description: 'Import Contract - Machinery Purchase (Demo)',
-    inceptionDate: new Date('2024-11-15'),
-    inceptionSpotRate: 98.30
-  },
-  {
-    id: 'demo-3',
-    contractDate: new Date('2024-10-20'),
-    maturityDate: new Date('2025-04-30'),
-    currencyPair: 'GBP/INR',
-    amount: 50000,
-    contractType: 'forward',
-    budgetedForwardRate: 112.30,
-    currentForwardRate: 116.55,
-    spotRate: 116.55,
-    pnl: 2125,
-    status: 'active',
-    description: 'Forward Hedge - Consultancy Income (Demo)',
-    inceptionDate: new Date('2024-10-20'),
-    inceptionSpotRate: 112.10
-  }
-]
+// Check if this is the first load (no contracts in state and no localStorage)
+const isFirstLoad = (): boolean => {
+  const savedContracts = localStorage.getItem('currency-risk-contracts')
+  return !savedContracts || savedContracts === '[]'
+}
 
-// Load data from localStorage
-const loadFromStorage = (key: string, defaultValue: any) => {
-  if (typeof window === 'undefined') return defaultValue
+// Local Storage Management
+const saveContractsToStorage = (contracts: Contract[]) => {
+  localStorage.setItem('currency-risk-contracts', JSON.stringify(contracts))
+}
+
+const loadContractsFromStorage = (): Contract[] => {
+  if (typeof window === 'undefined') return []
   
   try {
-    const stored = localStorage.getItem(key)
-    if (!stored) return defaultValue
-    
-    const parsed = JSON.parse(stored)
-    
-    // Handle Date objects in contracts
-    if (key === STORAGE_KEYS.CONTRACTS && Array.isArray(parsed)) {
-      return parsed.map((contract: any) => ({
+    const saved = localStorage.getItem('currency-risk-contracts')
+    if (saved) {
+      const parsed = JSON.parse(saved)
+      // Convert date strings back to Date objects and migrate to hedge management
+      const contracts = parsed.map((contract: any) => ({
         ...contract,
         contractDate: new Date(contract.contractDate),
         maturityDate: new Date(contract.maturityDate),
         inceptionDate: contract.inceptionDate ? new Date(contract.inceptionDate) : undefined,
-        lastUpdateDate: contract.lastUpdateDate ? new Date(contract.lastUpdateDate) : undefined
+        lastUpdateDate: contract.lastUpdateDate ? new Date(contract.lastUpdateDate) : undefined,
+        settlementDate: contract.settlementDate ? new Date(contract.settlementDate) : undefined,
+        nearLegDate: contract.nearLegDate ? new Date(contract.nearLegDate) : undefined,
+        farLegDate: contract.farLegDate ? new Date(contract.farLegDate) : undefined,
+        cancellationDate: contract.cancellationDate ? new Date(contract.cancellationDate) : undefined,
+        // Migrate utilization history dates
+        utilizationHistory: (contract.utilizationHistory || []).map((util: any) => ({
+          ...util,
+          utilizationDate: new Date(util.utilizationDate)
+        }))
       }))
+      
+      // Apply migration to add hedge management fields
+      const migratedContracts = migrateContractsToHedgeManagement(contracts)
+      
+      // Save back to storage with migration applied
+      saveContractsToStorage(migratedContracts)
+      
+      return migratedContracts
     }
-    
-    // Handle Date objects in interest rates
-    if (key === STORAGE_KEYS.INTEREST_RATES && Array.isArray(parsed)) {
-      return parsed.map((rate: any) => ({
-        ...rate,
-        lastUpdated: new Date(rate.lastUpdated)
-      }))
-    }
-    
-    // Handle last updated date
-    if (key === STORAGE_KEYS.LAST_UPDATED && parsed) {
-      return new Date(parsed)
-    }
-    
-    return parsed
   } catch (error) {
-    console.error(`Error loading ${key} from localStorage:`, error)
-    return defaultValue
+    console.error('Error loading contracts from storage:', error)
   }
+  return []
 }
 
-// Save data to localStorage
-const saveToStorage = (key: string, data: any) => {
-  if (typeof window === 'undefined') return
+// Migration function to update existing contracts with hedge management fields
+const migrateContractsToHedgeManagement = (contracts: Contract[]): Contract[] => {
+  return contracts.map(contract => {
+    // If contract already has hedge management fields, return as is
+    if (contract.hedgeStatus && contract.totalAmount !== undefined) {
+      return contract
+    }
+    
+    // Otherwise, add hedge management fields with defaults
+    return {
+      ...contract,
+      hedgeStatus: 'available' as const,
+      totalAmount: contract.amount,
+      availableAmount: contract.amount,
+      utilizedAmount: 0,
+      utilizationHistory: []
+    }
+  })
+}
+
+// Enhanced Demo Data Generator
+const generateDemoContracts = (): Contract[] => {
+  const today = new Date()
   
-  try {
-    localStorage.setItem(key, JSON.stringify(data))
-  } catch (error) {
-    console.error(`Error saving ${key} to localStorage:`, error)
-  }
-}
-
-// Check if this is the first load
-const isFirstLoad = () => {
-  if (typeof window === 'undefined') return false
-  return !localStorage.getItem(STORAGE_KEYS.FIRST_LOAD)
-}
-
-// Mark as not first load
-const markAsLoaded = () => {
-  if (typeof window === 'undefined') return
-  localStorage.setItem(STORAGE_KEYS.FIRST_LOAD, 'true')
-}
-
-const getInitialState = (): CurrencyState => {
-  // Load saved contracts or use demo contracts on first load
-  const savedContracts = loadFromStorage(STORAGE_KEYS.CONTRACTS, [])
-  const contracts = savedContracts.length > 0 ? savedContracts : (isFirstLoad() ? DEMO_CONTRACTS : [])
+  const demoContracts: Contract[] = [
+    {
+      id: 'demo-1',
+      contractDate: new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000), // 30 days ago
+      maturityDate: new Date(today.getTime() + 60 * 24 * 60 * 60 * 1000), // 60 days from now
+      currencyPair: 'USD/INR',
+      amount: 1000000,
+      contractType: 'export',
+      budgetedForwardRate: 82.50, // Fixed at inception
+      currentForwardRate: 83.25, // Current market rate
+      spotRate: 83.20,
+      pnl: (83.25 - 82.50) * 1000000, // Positive PnL for exporter
+      status: 'active',
+      description: 'Export revenue hedge - Q1 receivables',
+      
+      // HEDGE MANAGEMENT FIELDS
+      hedgeStatus: 'partially_utilized',
+      totalAmount: 1000000,
+      availableAmount: 650000,
+      utilizedAmount: 350000,
+      utilizationHistory: [
+        {
+          id: 'util-1',
+          utilizationDate: new Date(today.getTime() - 10 * 24 * 60 * 60 * 1000),
+          amount: 350000,
+          utilizationRate: 82.85,
+          utilizationType: 'settlement',
+          description: 'Export invoice settlement - Shipment #EXP2025001',
+          invoiceNumber: 'INV-EXP-2025-001',
+          shipmentDetails: 'Cotton export to Bangladesh - 50 MT',
+          realizationPnL: (82.85 - 82.50) * 350000,
+          documentsRequired: ['Bill of Lading', 'Export License', 'Invoice'],
+          complianceStatus: 'approved'
+        }
+      ],
+      
+      inceptionSpotRate: 82.45,
+      inceptionDate: new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000),
+      lastUpdateDate: today,
+      riskMetrics: {
+        volatility: 8.5,
+        maxDrawdown: -50000,
+        maxProfit: 150000,
+        valueAtRisk: 75000,
+        riskRating: 'Medium'
+      }
+    },
+    {
+      id: 'demo-2',
+      contractDate: new Date(today.getTime() - 15 * 24 * 60 * 60 * 1000), // 15 days ago
+      maturityDate: new Date(today.getTime() + 45 * 24 * 60 * 60 * 1000), // 45 days from now
+      currencyPair: 'EUR/USD',
+      amount: 500000,
+      contractType: 'import',
+      budgetedForwardRate: 1.0950, // Fixed at inception
+      currentForwardRate: 1.0875, // Current market rate
+      spotRate: 1.0870,
+      pnl: (1.0950 - 1.0875) * 500000, // Positive PnL for importer (rate went down)
+      status: 'active',
+      description: 'Import payment hedge - Equipment purchase',
+      
+      // HEDGE MANAGEMENT FIELDS
+      hedgeStatus: 'available',
+      totalAmount: 500000,
+      availableAmount: 500000,
+      utilizedAmount: 0,
+      utilizationHistory: [],
+      
+      inceptionSpotRate: 1.0945,
+      inceptionDate: new Date(today.getTime() - 15 * 24 * 60 * 60 * 1000),
+      lastUpdateDate: today,
+      riskMetrics: {
+        volatility: 6.2,
+        maxDrawdown: -25000,
+        maxProfit: 40000,
+        valueAtRisk: 30000,
+        riskRating: 'Low'
+      }
+    },
+    {
+      id: 'demo-3',
+      contractDate: new Date(today.getTime() - 60 * 24 * 60 * 60 * 1000), // 60 days ago
+      maturityDate: new Date(today.getTime() - 5 * 24 * 60 * 60 * 1000), // 5 days ago (matured)
+      currencyPair: 'GBP/INR',
+      amount: 750000,
+      contractType: 'forward',
+      budgetedForwardRate: 102.75, // Fixed at inception
+      currentForwardRate: 103.45, // Final settlement rate
+      spotRate: 103.40,
+      pnl: (103.45 - 102.75) * 750000, // Final realized PnL
+      status: 'matured',
+      description: 'Strategic forward position - Matured',
+      
+      // HEDGE MANAGEMENT FIELDS
+      hedgeStatus: 'fully_utilized',
+      totalAmount: 750000,
+      availableAmount: 0,
+      utilizedAmount: 750000,
+      utilizationHistory: [
+        {
+          id: 'util-2',
+          utilizationDate: new Date(today.getTime() - 5 * 24 * 60 * 60 * 1000),
+          amount: 750000,
+          utilizationRate: 103.45,
+          utilizationType: 'settlement',
+          description: 'Contract maturity settlement',
+          realizationPnL: (103.45 - 102.75) * 750000,
+          documentsRequired: ['Settlement Confirmation'],
+          complianceStatus: 'approved'
+        }
+      ],
+      
+      inceptionSpotRate: 102.50,
+      inceptionDate: new Date(today.getTime() - 60 * 24 * 60 * 60 * 1000),
+      lastUpdateDate: new Date(today.getTime() - 5 * 24 * 60 * 60 * 1000),
+      riskMetrics: {
+        volatility: 9.1,
+        maxDrawdown: -35000,
+        maxProfit: 52500,
+        valueAtRisk: 45000,
+        riskRating: 'Medium'
+      }
+    }
+  ]
   
-  return {
-    contracts,
-    currencyRates: loadFromStorage(STORAGE_KEYS.RATES, []),
-    interestRates: loadFromStorage(STORAGE_KEYS.INTEREST_RATES, []),
-    isLoading: false,
-    lastUpdated: loadFromStorage(STORAGE_KEYS.LAST_UPDATED, null),
-  }
+  return demoContracts
 }
 
 function currencyReducer(state: CurrencyState, action: CurrencyAction): CurrencyState {
-  let newState: CurrencyState
-  
   switch (action.type) {
     case 'SET_CONTRACTS':
-      newState = { ...state, contracts: action.payload }
-      saveToStorage(STORAGE_KEYS.CONTRACTS, action.payload)
-      break
+      saveContractsToStorage(action.payload)
+      return { ...state, contracts: action.payload }
     case 'ADD_CONTRACT':
-      newState = { ...state, contracts: [...state.contracts, action.payload] }
-      saveToStorage(STORAGE_KEYS.CONTRACTS, newState.contracts)
-      break
+      const newContracts = [...state.contracts, action.payload]
+      saveContractsToStorage(newContracts)
+      return { ...state, contracts: newContracts }
     case 'UPDATE_CONTRACT':
-      newState = {
-        ...state,
-        contracts: state.contracts.map(contract =>
-          contract.id === action.payload.id ? action.payload : contract
-        ),
-      }
-      saveToStorage(STORAGE_KEYS.CONTRACTS, newState.contracts)
-      break
+      const updatedContracts = state.contracts.map(contract =>
+        contract.id === action.payload.id ? action.payload : contract
+      )
+      saveContractsToStorage(updatedContracts)
+      return { ...state, contracts: updatedContracts }
     case 'DELETE_CONTRACT':
-      newState = {
-        ...state,
-        contracts: state.contracts.filter(contract => contract.id !== action.payload),
-      }
-      saveToStorage(STORAGE_KEYS.CONTRACTS, newState.contracts)
-      break
+      const filteredContracts = state.contracts.filter(contract => contract.id !== action.payload)
+      saveContractsToStorage(filteredContracts)
+      return { ...state, contracts: filteredContracts }
+    case 'CLEAR_CONTRACTS':
+      saveContractsToStorage([])
+      return { ...state, contracts: [] }
     case 'SET_CURRENCY_RATES':
-      newState = { ...state, currencyRates: action.payload }
-      saveToStorage(STORAGE_KEYS.RATES, action.payload)
-      break
+      return { ...state, currencyRates: action.payload }
     case 'SET_INTEREST_RATES':
-      newState = { ...state, interestRates: action.payload }
-      saveToStorage(STORAGE_KEYS.INTEREST_RATES, action.payload)
-      break
+      return { ...state, interestRates: action.payload }
     case 'SET_LOADING':
-      newState = { ...state, isLoading: action.payload }
-      break
+      return { ...state, isLoading: action.payload }
     case 'SET_LAST_UPDATED':
-      newState = { ...state, lastUpdated: action.payload }
-      saveToStorage(STORAGE_KEYS.LAST_UPDATED, action.payload)
-      break
+      return { ...state, lastUpdated: action.payload }
+    
+    // HEDGE MANAGEMENT ACTIONS
+    case 'UTILIZE_HEDGE':
+      const utilizedContracts = state.contracts.map(contract => {
+        if (contract.id === action.payload.contractId) {
+          const newUtilization = action.payload.utilization
+          const newUtilizedAmount = contract.utilizedAmount + newUtilization.amount
+          const newAvailableAmount = contract.totalAmount - newUtilizedAmount
+          
+          let newHedgeStatus: Contract['hedgeStatus'] = 'available'
+          if (newAvailableAmount === 0) {
+            newHedgeStatus = 'fully_utilized'
+          } else if (newUtilizedAmount > 0) {
+            newHedgeStatus = 'partially_utilized'
+          }
+          
+          return {
+            ...contract,
+            utilizedAmount: newUtilizedAmount,
+            availableAmount: newAvailableAmount,
+            hedgeStatus: newHedgeStatus,
+            utilizationHistory: [...contract.utilizationHistory, newUtilization],
+            status: newHedgeStatus === 'fully_utilized' ? 'closed' as const : contract.status
+          }
+        }
+        return contract
+      })
+      saveContractsToStorage(utilizedContracts)
+      return { ...state, contracts: utilizedContracts }
+      
+    case 'CANCEL_HEDGE':
+      const cancelledContracts = state.contracts.map(contract => {
+        if (contract.id === action.payload.contractId) {
+          return {
+            ...contract,
+            hedgeStatus: 'cancelled' as const,
+            status: 'closed' as const,
+            cancellationReason: action.payload.reason,
+            cancellationDate: new Date(),
+            cancellationPnL: action.payload.cancellationPnL
+          }
+        }
+        return contract
+      })
+      saveContractsToStorage(cancelledContracts)
+      return { ...state, contracts: cancelledContracts }
+      
+    case 'ROLLOVER_HEDGE':
+      const rolloverContracts = state.contracts.map(contract => {
+        if (contract.id === action.payload.contractId) {
+          return {
+            ...contract,
+            maturityDate: action.payload.newMaturityDate,
+            lastUpdateDate: new Date()
+          }
+        }
+        return contract
+      })
+      saveContractsToStorage(rolloverContracts)
+      return { ...state, contracts: rolloverContracts }
+      
     default:
       return state
   }
-  
-  return newState
 }
 
 interface CurrencyContextType {
@@ -265,13 +431,18 @@ interface CurrencyContextType {
   addContract: (contract: Omit<Contract, 'id'>) => void
   updateContract: (contract: Contract) => void
   deleteContract: (id: string) => void
-  refreshRates: (showToast?: boolean) => Promise<void>
   clearAllContracts: () => void
   loadDemoContracts: () => void
-  // New world-class functions
-  initializeContractWithLiveRate: (contractData: Omit<Contract, 'id' | 'budgetedForwardRate' | 'inceptionSpotRate' | 'inceptionDate'>) => Promise<void>
+  refreshRates: (showToast?: boolean) => Promise<void>
+  initializeContractWithLiveRate: (contractData: Omit<Contract, 'id' | 'currentForwardRate' | 'spotRate' | 'pnl'>) => Promise<void>
   recalculateContractPnL: (contractId: string) => Promise<void>
   recalculateAllContractsPnL: () => Promise<void>
+  
+  // HEDGE MANAGEMENT FUNCTIONS
+  utilizeHedge: (contractId: string, utilization: Omit<HedgeUtilization, 'id' | 'realizationPnL'>) => void
+  cancelHedge: (contractId: string, reason: string) => void
+  rolloverHedge: (contractId: string, newMaturityDate: Date) => void
+  getHedgeUtilization: (contractId: string) => { utilized: number; available: number; percentage: number }
 }
 
 const CurrencyContext = createContext<CurrencyContextType | undefined>(undefined)
@@ -282,225 +453,218 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
   // Mark as loaded on first render
   useEffect(() => {
     if (isFirstLoad()) {
-      markAsLoaded()
+      console.log('✅ First load detected - ready for demo contracts or user input')
+    } else {
+      console.log('🔄 Loading existing contracts from localStorage...')
+      const savedContracts = loadContractsFromStorage()
+      if (savedContracts.length > 0) {
+        // Migrate existing contracts to include hedge management fields
+        const migratedContracts = migrateContractsToHedgeManagement(savedContracts)
+        
+        dispatch({ type: 'SET_CONTRACTS', payload: migratedContracts })
+        console.log(`✅ Loaded ${migratedContracts.length} contracts from localStorage`)
+      }
     }
   }, [])
 
-  const addContract = (contractData: Omit<Contract, 'id'>) => {
-    const contract: Contract = {
+  const addContract = useCallback((contractData: Omit<Contract, 'id'>) => {
+    const newContract: Contract = {
       ...contractData,
-      id: `contract_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      id: `contract-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
     }
-    dispatch({ type: 'ADD_CONTRACT', payload: contract })
-    toast.success('Contract created successfully and saved!')
-  }
+    dispatch({ type: 'ADD_CONTRACT', payload: newContract })
+    toast.success('✅ Contract added successfully!')
+  }, [])
 
-  const updateContract = (contract: Contract) => {
+  const updateContract = useCallback((contract: Contract) => {
     dispatch({ type: 'UPDATE_CONTRACT', payload: contract })
-    toast.success('Contract updated successfully')
-  }
+    toast.success('✅ Contract updated successfully!')
+  }, [])
 
-  const deleteContract = (id: string) => {
+  const deleteContract = useCallback((id: string) => {
     dispatch({ type: 'DELETE_CONTRACT', payload: id })
-    toast.success('Contract deleted successfully')
-  }
+    toast.success('🗑️ Contract deleted successfully!')
+  }, [])
 
-  const clearAllContracts = () => {
-    dispatch({ type: 'SET_CONTRACTS', payload: [] })
-    toast.success('All contracts cleared!')
-  }
+  const clearAllContracts = useCallback(() => {
+    dispatch({ type: 'CLEAR_CONTRACTS' })
+    toast.success('🧹 All contracts cleared!')
+  }, [])
 
-  const loadDemoContracts = () => {
-    dispatch({ type: 'SET_CONTRACTS', payload: DEMO_CONTRACTS })
-    toast.success('Demo contracts loaded!')
-  }
+  const loadDemoContracts = useCallback(() => {
+    const demoContracts = generateDemoContracts()
+    dispatch({ type: 'SET_CONTRACTS', payload: demoContracts })
+    toast.success('📊 Demo contracts loaded! Live rates will be fetched automatically.')
+  }, [])
 
-  const refreshRates = useCallback(async (showToast: boolean = false) => {
+  // Enhanced Rate Fetching with Live API Integration
+  const refreshRates = useCallback(async (showToast: boolean = true) => {
     dispatch({ type: 'SET_LOADING', payload: true })
+    
     try {
-      // Fetch live currency rates
-      const currencyResponse = await fetch('/api/currency-rates', {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-        },
-        cache: 'no-store' // Force fresh data
-      })
+      console.log('🔄 Starting live currency data fetch...')
       
-      if (!currencyResponse.ok) {
-        throw new Error(`API request failed with status ${currencyResponse.status}`)
-      }
-      
+      // Fetch currency rates from API route
+      const currencyResponse = await fetch('/api/currency-rates')
       const currencyData = await currencyResponse.json()
       
-      // Check if the API returned an error instead of data
-      if (currencyData.error) {
-        throw new Error(currencyData.message || currencyData.error)
+      if (currencyResponse.ok && currencyData.success && currencyData.rates) {
+        dispatch({ type: 'SET_CURRENCY_RATES', payload: currencyData.rates })
+        dispatch({ type: 'SET_LAST_UPDATED', payload: new Date() })
+        console.log('✅ Live currency rates updated:', currencyData.rates.length, 'pairs')
+      } else {
+        console.warn('⚠️ Currency rates API response invalid:', currencyData)
+        // Don't throw error, just log it and continue
+        console.log('📊 Using existing rates if available, or showing empty state')
       }
       
-      // Extract the rates array from the API response
-      const rates = currencyData.rates || []
+      // Fetch interest rates from API route
+      const interestResponse = await fetch('/api/interest-rates')
+      const interestData = await interestResponse.json()
       
-      if (rates.length === 0) {
-        throw new Error('No currency rates received from API')
+      if (interestResponse.ok && interestData.success && interestData.rates) {
+        dispatch({ type: 'SET_INTEREST_RATES', payload: interestData.rates })
+        console.log('✅ Live interest rates updated:', interestData.rates.length, 'currencies')
+      } else {
+        console.warn('⚠️ Interest rates API response invalid:', interestData)
+        // Don't throw error, just log it and continue
+        console.log('📊 Using existing interest rates if available')
       }
-
-      dispatch({ type: 'SET_CURRENCY_RATES', payload: rates })
-      dispatch({ type: 'SET_LAST_UPDATED', payload: new Date() })
       
-      // Auto-recalculate all contracts P&L when rates update
-      await recalculateAllContractsPnL()
-      
-      // Only show toast message when manually triggered, not during automatic updates
       if (showToast) {
-        toast.success(`✅ Live rates updated successfully (${rates.length} pairs)`)
+        toast.success('💱 Live rates updated successfully!')
       }
       
-      console.log('✅ Currency rates updated:', rates.length, 'pairs')
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-      
-      // Only show error toast when manually triggered
+      console.error('❌ Failed to fetch live currency data:', error)
       if (showToast) {
-        toast.error(`❌ Failed to get live rates: ${errorMessage}`)
+        toast.error('Failed to update rates. Using existing data.')
       }
-      
-      console.error('CRITICAL - Error fetching live rates:', error)
-      
-      // Set empty array to show error state in UI instead of stale data
-      dispatch({ type: 'SET_CURRENCY_RATES', payload: [] })
     } finally {
       dispatch({ type: 'SET_LOADING', payload: false })
     }
-  }, []) // Empty dependency array - function never changes
+  }, [])
 
-  // WORLD-CLASS: Initialize contract with live rate for budgeted forward
-  const initializeContractWithLiveRate = useCallback(async (contractData: Omit<Contract, 'id' | 'budgetedForwardRate' | 'inceptionSpotRate' | 'inceptionDate'>) => {
+  // Initialize Contract with Live Rate (used during contract creation)
+  const initializeContractWithLiveRate = useCallback(async (contractData: Omit<Contract, 'id' | 'currentForwardRate' | 'spotRate' | 'pnl'>) => {
     try {
       // Ensure we have fresh rates
-      if (state.currencyRates.length === 0) {
-        await refreshRates(false)
-      }
+      await refreshRates(false)
       
-      // Get current live spot rate
+      // Find the currency rate for this pair
       const rateInfo = state.currencyRates.find(r => r.pair === contractData.currencyPair)
       if (!rateInfo) {
-        throw new Error(`Live rate not found for ${contractData.currencyPair}`)
+        throw new Error(`Rate not found for ${contractData.currencyPair}`)
       }
       
-      const currentSpotRate = rateInfo.spotRate
-      const contractMaturityDays = Math.ceil((contractData.maturityDate.getTime() - contractData.contractDate.getTime()) / (1000 * 60 * 60 * 24))
+      // Calculate appropriate forward rate based on maturity
+      const daysToMaturity = Math.ceil((contractData.maturityDate.getTime() - contractData.contractDate.getTime()) / (1000 * 60 * 60 * 24))
+      let forwardRate = rateInfo.spotRate
       
-      // CORRECTED: Calculate budgeted forward rate using current spot rate
-      // This forward rate becomes the budgeted rate for the entire contract life
-      const { calculateForwardRate } = await import('@/lib/enhanced-financial-utils')
-      const [baseCurrency, quoteCurrency] = contractData.currencyPair.split('/')
+      if (daysToMaturity <= 30) {
+        forwardRate = rateInfo.forwardRate30D
+      } else if (daysToMaturity <= 90) {
+        forwardRate = rateInfo.forwardRate90D
+      } else if (daysToMaturity <= 180) {
+        forwardRate = rateInfo.forwardRate180D
+      } else {
+        forwardRate = rateInfo.forwardRate365D
+      }
       
-      const budgetedForwardRate = calculateForwardRate(
-        currentSpotRate,
-        baseCurrency,
-        quoteCurrency,
-        contractMaturityDays
-      )
+      // Calculate initial PnL (should be 0 at inception)
+      const initialPnL = (forwardRate - contractData.budgetedForwardRate) * contractData.amount
       
-      const contract: Contract = {
+      const enhancedContract: Contract = {
         ...contractData,
-        id: Date.now().toString(),
-        budgetedForwardRate, // This is calculated from current spot rate
-        currentForwardRate: budgetedForwardRate, // Initially same as budgeted
-        spotRate: currentSpotRate,
-        pnl: 0, // Initially zero
-        inceptionSpotRate: currentSpotRate,
+        id: `contract-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        currentForwardRate: forwardRate,
+        spotRate: rateInfo.spotRate,
+        pnl: initialPnL,
+        
+        // HEDGE MANAGEMENT FIELDS - Initialize as new available hedge
+        hedgeStatus: 'available',
+        totalAmount: contractData.amount,
+        availableAmount: contractData.amount,
+        utilizedAmount: 0,
+        utilizationHistory: [],
+        
+        inceptionSpotRate: rateInfo.spotRate,
         inceptionDate: new Date(),
         lastUpdateDate: new Date(),
-        riskMetrics: {
-          volatility: 0,
-          maxDrawdown: 0,
-          maxProfit: 0,
-          valueAtRisk: 0,
-          riskRating: 'Low'
-        }
       }
       
-      dispatch({ type: 'ADD_CONTRACT', payload: contract })
-      toast.success(`✅ Contract created with budgeted forward rate: ${budgetedForwardRate.toFixed(4)}`)
-      
-      console.log(`✅ Contract initialized with CORRECTED logic:`, {
-        id: contract.id,
-        currencyPair: contract.currencyPair,
-        inceptionSpotRate: currentSpotRate,
-        budgetedForwardRate: budgetedForwardRate,
-        maturityDays: contractMaturityDays,
-        formula: `F = ${currentSpotRate} × e^((r_foreign - r_domestic) × ${contractMaturityDays/365})`
-      })
+      dispatch({ type: 'ADD_CONTRACT', payload: enhancedContract })
+      toast.success('✅ Contract created with live rates!')
       
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-      toast.error(`❌ Failed to create contract: ${errorMessage}`)
-      console.error('Error creating contract:', error)
+      console.error('❌ Failed to initialize contract with live rate:', error)
+      toast.error('Failed to create contract with live rates')
+      throw error
     }
   }, [state.currencyRates, refreshRates])
 
-  // WORLD-CLASS: Recalculate P&L for specific contract
+  // Recalculate PnL for a specific contract
   const recalculateContractPnL = useCallback(async (contractId: string) => {
+    const contract = state.contracts.find(c => c.id === contractId)
+    if (!contract) return
+    
     try {
-      const contract = state.contracts.find(c => c.id === contractId)
-      if (!contract) {
-        throw new Error(`Contract ${contractId} not found`)
-      }
-      
+      // Get fresh rates
       const rateInfo = state.currencyRates.find(r => r.pair === contract.currencyPair)
       if (!rateInfo) {
-        console.warn(`No live rate found for ${contract.currencyPair}`)
+        console.warn(`No rate found for ${contract.currencyPair}`)
         return
       }
       
-      const currentSpotRate = rateInfo.spotRate
-      const remainingDays = Math.ceil((contract.maturityDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
+      // Calculate days to maturity and appropriate forward rate
+      const daysToMaturity = Math.ceil((contract.maturityDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
+      let forwardRate = rateInfo.spotRate
       
-      // Calculate current forward rate
-      const currentForwardRate = currentSpotRate * Math.exp((0.045 - 0.065) * (remainingDays / 365))
+      if (daysToMaturity <= 30) {
+        forwardRate = rateInfo.forwardRate30D
+      } else if (daysToMaturity <= 90) {
+        forwardRate = rateInfo.forwardRate90D
+      } else if (daysToMaturity <= 180) {
+        forwardRate = rateInfo.forwardRate180D
+      } else {
+        forwardRate = rateInfo.forwardRate365D
+      }
       
-      // Calculate P&L vs budgeted forward (which never changes)
-      const pnl = (currentForwardRate - contract.budgetedForwardRate) * contract.amount
+      // Calculate PnL based on contract type
+      let pnl = 0
+      if (contract.contractType === 'export') {
+        // For exports, benefit when forward rate increases
+        pnl = (forwardRate - contract.budgetedForwardRate) * contract.amount
+      } else if (contract.contractType === 'import') {
+        // For imports, benefit when forward rate decreases
+        pnl = (contract.budgetedForwardRate - forwardRate) * contract.amount
+      } else {
+        // For forwards, PnL depends on position
+        pnl = (forwardRate - contract.budgetedForwardRate) * contract.amount
+      }
       
-      // Update contract
       const updatedContract: Contract = {
         ...contract,
-        currentForwardRate,
-        spotRate: currentSpotRate,
+        currentForwardRate: forwardRate,
+        spotRate: rateInfo.spotRate,
         pnl,
         lastUpdateDate: new Date(),
-        riskMetrics: {
-          volatility: Math.abs(currentForwardRate - contract.budgetedForwardRate) / contract.budgetedForwardRate * 100,
-          maxDrawdown: contract.riskMetrics?.maxDrawdown || 0,
-          maxProfit: contract.riskMetrics?.maxProfit || 0,
-          valueAtRisk: contract.riskMetrics?.valueAtRisk || 0,
-          riskRating: contract.riskMetrics?.riskRating || 'Low'
-        }
       }
       
       dispatch({ type: 'UPDATE_CONTRACT', payload: updatedContract })
       
     } catch (error) {
-      console.error(`Error recalculating P&L for contract ${contractId}:`, error)
+      console.error('❌ Failed to recalculate contract PnL:', error)
     }
   }, [state.contracts, state.currencyRates])
 
-  // WORLD-CLASS: Recalculate P&L for all contracts
+  // Recalculate PnL for all contracts
   const recalculateAllContractsPnL = useCallback(async () => {
-    try {
-      const activeContracts = state.contracts.filter(c => c.status === 'active')
-      
-      for (const contract of activeContracts) {
-        await recalculateContractPnL(contract.id)
-      }
-      
-      console.log(`✅ Recalculated P&L for ${activeContracts.length} active contracts`)
-      
-    } catch (error) {
-      console.error('Error recalculating all contracts P&L:', error)
+    console.log('🔄 Recalculating PnL for all contracts...')
+    for (const contract of state.contracts) {
+      await recalculateContractPnL(contract.id)
     }
+    console.log('✅ All contract PnL recalculated')
   }, [state.contracts, recalculateContractPnL])
 
   useEffect(() => {
@@ -525,6 +689,79 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
     }
   }, [refreshRates]) // Only depend on the memoized refreshRates function
 
+  // HEDGE MANAGEMENT FUNCTIONS
+  
+  const utilizeHedge = useCallback((contractId: string, utilizationData: Omit<HedgeUtilization, 'id' | 'realizationPnL'>) => {
+    const contract = state.contracts.find(c => c.id === contractId)
+    if (!contract) {
+      toast.error('Contract not found')
+      return
+    }
+    
+    if (utilizationData.amount > contract.availableAmount) {
+      toast.error(`Utilization amount (${utilizationData.amount}) exceeds available amount (${contract.availableAmount})`)
+      return
+    }
+    
+    // Calculate realization P&L
+    const realizationPnL = (utilizationData.utilizationRate - contract.budgetedForwardRate) * utilizationData.amount
+    
+    const utilization: HedgeUtilization = {
+      ...utilizationData,
+      id: `util-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      realizationPnL
+    }
+    
+    dispatch({ type: 'UTILIZE_HEDGE', payload: { contractId, utilization } })
+    
+    toast.success(`Hedge utilized: ${utilizationData.amount.toLocaleString()} at rate ${utilizationData.utilizationRate}`)
+  }, [state.contracts])
+  
+  const cancelHedge = useCallback((contractId: string, reason: string) => {
+    const contract = state.contracts.find(c => c.id === contractId)
+    if (!contract) {
+      toast.error('Contract not found')
+      return
+    }
+    
+    // Calculate cancellation P&L (mark-to-market at cancellation)
+    const cancellationPnL = (contract.currentForwardRate - contract.budgetedForwardRate) * contract.availableAmount
+    
+    dispatch({ type: 'CANCEL_HEDGE', payload: { contractId, reason, cancellationPnL } })
+    
+    toast.success(`Hedge cancelled. P&L: ₹${cancellationPnL.toLocaleString()}`)
+  }, [state.contracts])
+  
+  const rolloverHedge = useCallback((contractId: string, newMaturityDate: Date) => {
+    const contract = state.contracts.find(c => c.id === contractId)
+    if (!contract) {
+      toast.error('Contract not found')
+      return
+    }
+    
+    dispatch({ type: 'ROLLOVER_HEDGE', payload: { contractId, newMaturityDate } })
+    
+    toast.success(`Hedge rolled over to ${newMaturityDate.toDateString()}`)
+  }, [state.contracts])
+  
+  const getHedgeUtilization = useCallback((contractId: string) => {
+    const contract = state.contracts.find(c => c.id === contractId)
+    if (!contract) {
+      return { utilized: 0, available: 0, percentage: 0 }
+    }
+    
+    // Handle contracts without hedge management fields (fallback to original amount)
+    const totalAmount = contract.totalAmount ?? contract.amount
+    const utilizedAmount = contract.utilizedAmount ?? 0
+    const availableAmount = contract.availableAmount ?? contract.amount
+    
+    return {
+      utilized: utilizedAmount,
+      available: availableAmount,
+      percentage: totalAmount > 0 ? (utilizedAmount / totalAmount) * 100 : 0
+    }
+  }, [state.contracts])
+
   return (
     <CurrencyContext.Provider
       value={{
@@ -538,6 +775,10 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
         initializeContractWithLiveRate,
         recalculateContractPnL,
         recalculateAllContractsPnL,
+        utilizeHedge,
+        cancelHedge,
+        rolloverHedge,
+        getHedgeUtilization,
       }}
     >
       {children}

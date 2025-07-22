@@ -19,6 +19,18 @@ export default function ContractManagement() {
     amount: string
     contractType: 'export' | 'import' | 'forward' | 'spot' | 'swap' | 'option'
     description: string
+    budgetedForwardRate?: string
+    // Option-specific fields
+    optionType?: 'call' | 'put'
+    strikeRate?: string
+    premium?: string
+    // Swap-specific fields
+    nearLegDays?: string
+    farLegDays?: string
+    swapType?: 'fixed-floating' | 'floating-floating' | 'fixed-fixed'
+    swapPoints?: string
+    // Spot-specific fields
+    settlementDays?: string
   }>({
     contractDate: format(new Date(), 'yyyy-MM-dd'),
     maturityDate: '',
@@ -26,6 +38,16 @@ export default function ContractManagement() {
     amount: '',
     contractType: 'export',
     description: '',
+    budgetedForwardRate: '',
+    // Default values for new fields
+    optionType: 'call',
+    strikeRate: '',
+    premium: '',
+    nearLegDays: '7',
+    farLegDays: '90',
+    swapType: 'fixed-floating',
+    swapPoints: '',
+    settlementDays: '2'
   })
 
   const currencyPairs = [
@@ -47,23 +69,8 @@ export default function ContractManagement() {
     
     try {
       if (editingContract) {
-        // For updating existing contracts, use the old method
-        const rateInfo = state.currencyRates.find(r => r.pair === formData.currencyPair)
-        if (!rateInfo) {
-          toast.error(`No live rate available for ${formData.currencyPair}`)
-          return
-        }
-        
-        const spotRate = rateInfo.spotRate
-        const maturityDays = Math.ceil((new Date(formData.maturityDate).getTime() - new Date(formData.contractDate).getTime()) / (1000 * 60 * 60 * 24))
-        
-        // Calculate accurate budgeted forward rate using Interest Rate Parity
-        const [baseCurrency, quoteCurrency] = formData.currencyPair.split('/')
-        const foreignRate = INTEREST_RATES[baseCurrency as keyof typeof INTEREST_RATES] || 0.05
-        const domesticRate = INTEREST_RATES[quoteCurrency as keyof typeof INTEREST_RATES] || 0.055
-        
-        const budgetedForwardRate = spotRate * Math.exp((foreignRate - domesticRate) * (maturityDays / 365))
-        
+        // For updating existing contracts, PRESERVE the original budgeted forward rate
+        // The budgeted forward rate is FIXED at inception and NEVER changes
         const contractData = {
           ...editingContract,
           contractDate: new Date(formData.contractDate),
@@ -71,28 +78,69 @@ export default function ContractManagement() {
           currencyPair: formData.currencyPair,
           amount: parseFloat(formData.amount),
           contractType: formData.contractType,
-          budgetedForwardRate,
-          currentForwardRate: budgetedForwardRate,
-          spotRate,
+          budgetedForwardRate: parseFloat(formData.budgetedForwardRate || editingContract.budgetedForwardRate.toString()),
           description: formData.description,
+          // Note: currentForwardRate and spotRate will be updated by the context
         }
         
         updateContract(contractData)
         setEditingContract(null)
       } else {
-        // For new contracts, use the enhanced method
-        await initializeContractWithLiveRate({
+        // For new contracts, calculate budgeted forward rate if not provided
+        let budgetedForwardRate = parseFloat(formData.budgetedForwardRate || '0')
+        
+        // If no manual budgeted rate provided, auto-calculate using IRP
+        if (!formData.budgetedForwardRate || budgetedForwardRate === 0) {
+          const rateInfo = state.currencyRates.find((r: any) => r.pair === formData.currencyPair)
+          if (!rateInfo) {
+            toast.error(`No live rate available for ${formData.currencyPair}`)
+            return
+          }
+          
+          const spotRate = rateInfo.spotRate
+          const maturityDays = Math.ceil((new Date(formData.maturityDate).getTime() - new Date(formData.contractDate).getTime()) / (1000 * 60 * 60 * 24))
+          
+          // Calculate budgeted forward rate using Interest Rate Parity
+          const [baseCurrency, quoteCurrency] = formData.currencyPair.split('/')
+          const foreignRate = INTEREST_RATES[baseCurrency as keyof typeof INTEREST_RATES] || 0.05
+          const domesticRate = INTEREST_RATES[quoteCurrency as keyof typeof INTEREST_RATES] || 0.055
+          
+          budgetedForwardRate = spotRate * Math.exp((foreignRate - domesticRate) * (maturityDays / 365))
+          
+          toast.success(`Auto-calculated Budgeted Forward Rate: ${budgetedForwardRate.toFixed(4)}`)
+        }
+        
+        // Use the enhanced method with contract-specific data
+        const baseContractData: Omit<Contract, 'id' | 'currentForwardRate' | 'spotRate' | 'pnl'> = {
           contractDate: new Date(formData.contractDate),
           maturityDate: new Date(formData.maturityDate),
           currencyPair: formData.currencyPair,
           amount: parseFloat(formData.amount),
           contractType: formData.contractType,
-          currentForwardRate: 0, // Will be calculated
-          spotRate: 0, // Will be calculated
-          pnl: 0,
-          status: 'active',
+          budgetedForwardRate,
+          status: 'active' as const,
           description: formData.description,
-        })
+        }
+        
+        // Add contract-specific fields based on type
+        if (formData.contractType === 'option') {
+          baseContractData.optionType = formData.optionType as 'call' | 'put'
+          baseContractData.strikeRate = formData.strikeRate ? parseFloat(formData.strikeRate) : undefined
+          baseContractData.premium = formData.premium ? parseFloat(formData.premium) : undefined
+        } else if (formData.contractType === 'swap') {
+          baseContractData.nearLegDays = parseInt(formData.nearLegDays || '7')
+          baseContractData.farLegDays = parseInt(formData.farLegDays || '90')
+          baseContractData.swapPoints = formData.swapPoints ? parseFloat(formData.swapPoints) : undefined
+        } else if (formData.contractType === 'spot') {
+          // For spot transactions, set maturity date based on settlement days
+          const settlementDays = parseInt(formData.settlementDays || '2')
+          const settlementDate = new Date(formData.contractDate)
+          settlementDate.setDate(settlementDate.getDate() + settlementDays)
+          baseContractData.maturityDate = settlementDate
+          baseContractData.settlementDays = settlementDays
+        }
+        
+        await initializeContractWithLiveRate(baseContractData)
       }
 
       // Reset form
@@ -103,6 +151,15 @@ export default function ContractManagement() {
         amount: '',
         contractType: 'export',
         description: '',
+        budgetedForwardRate: '',
+        optionType: 'call',
+        strikeRate: '',
+        premium: '',
+        nearLegDays: '7',
+        farLegDays: '90',
+        swapType: 'fixed-floating',
+        swapPoints: '',
+        settlementDays: '2'
       })
       setShowCreateForm(false)
       toast.success('Contract created successfully with live rates!')
@@ -120,6 +177,15 @@ export default function ContractManagement() {
       amount: '',
       contractType: 'export',
       description: '',
+      budgetedForwardRate: '',
+      optionType: 'call',
+      strikeRate: '',
+      premium: '',
+      nearLegDays: '7',
+      farLegDays: '90',
+      swapType: 'fixed-floating',
+      swapPoints: '',
+      settlementDays: '2'
     })
     setShowCreateForm(false)
   }
@@ -133,6 +199,15 @@ export default function ContractManagement() {
       amount: contract.amount.toString(),
       contractType: contract.contractType,
       description: contract.description,
+      budgetedForwardRate: contract.budgetedForwardRate.toString(),
+      optionType: contract.optionType || 'call',
+      strikeRate: contract.strikeRate?.toString() || '',
+      premium: contract.premium?.toString() || '',
+      nearLegDays: contract.nearLegDays?.toString() || '7',
+      farLegDays: contract.farLegDays?.toString() || '90',
+      swapType: 'fixed-floating', // Default since not defined in contract
+      swapPoints: contract.swapPoints?.toString() || '',
+      settlementDays: contract.settlementDays?.toString() || '2'
     })
     setShowCreateForm(true)
   }
@@ -147,6 +222,15 @@ export default function ContractManagement() {
       amount: '',
       contractType: 'export',
       description: '',
+      budgetedForwardRate: '',
+      optionType: 'call',
+      strikeRate: '',
+      premium: '',
+      nearLegDays: '7',
+      farLegDays: '90',
+      swapType: 'fixed-floating',
+      swapPoints: '',
+      settlementDays: '2'
     })
   }
 
@@ -245,6 +329,134 @@ export default function ContractManagement() {
                   ))}
                 </select>
               </div>
+              
+              {/* Dynamic fields based on contract type */}
+              {formData.contractType === 'option' && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Option Type
+                    </label>
+                    <select
+                      value={formData.optionType || 'call'}
+                      onChange={(e) => setFormData({ ...formData, optionType: e.target.value as 'call' | 'put' })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                      required
+                    >
+                      <option value="call">Call Option</option>
+                      <option value="put">Put Option</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Strike Rate (Optional - defaults to 2% OTM)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.0001"
+                      value={formData.strikeRate || ''}
+                      onChange={(e) => setFormData({ ...formData, strikeRate: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Leave empty for auto-calculation"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Premium (Optional - will be calculated if empty)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={formData.premium || ''}
+                      onChange={(e) => setFormData({ ...formData, premium: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Leave empty for Black-Scholes calculation"
+                    />
+                  </div>
+                </>
+              )}
+              
+              {formData.contractType === 'swap' && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Swap Type
+                    </label>
+                    <select
+                      value={formData.swapType || 'fixed-floating'}
+                      onChange={(e) => setFormData({ ...formData, swapType: e.target.value as any })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                      required
+                    >
+                      <option value="fixed-floating">Fixed vs Floating</option>
+                      <option value="floating-floating">Floating vs Floating</option>
+                      <option value="fixed-fixed">Fixed vs Fixed</option>
+                    </select>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Near Leg (Days)
+                      </label>
+                      <input
+                        type="number"
+                        value={formData.nearLegDays || '7'}
+                        onChange={(e) => setFormData({ ...formData, nearLegDays: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                        min="1"
+                        max="30"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Far Leg (Days)
+                      </label>
+                      <input
+                        type="number"
+                        value={formData.farLegDays || '90'}
+                        onChange={(e) => setFormData({ ...formData, farLegDays: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                        min="7"
+                        max="365"
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Swap Points (Optional - will be calculated if empty)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.0001"
+                      value={formData.swapPoints || ''}
+                      onChange={(e) => setFormData({ ...formData, swapPoints: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Leave empty for IRP calculation"
+                    />
+                  </div>
+                </>
+              )}
+              
+              {formData.contractType === 'spot' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Settlement Days
+                  </label>
+                  <select
+                    value={formData.settlementDays || '2'}
+                    onChange={(e) => setFormData({ ...formData, settlementDays: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                    required
+                  >
+                    <option value="0">Same Day (T+0)</option>
+                    <option value="1">Next Day (T+1)</option>
+                    <option value="2">Spot (T+2) - Standard</option>
+                  </select>
+                </div>
+              )}
+              
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Description
@@ -256,6 +468,31 @@ export default function ContractManagement() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
                   placeholder="e.g., Paddy export to Iran"
                 />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Budgeted Forward Rate
+                  <span className="text-xs text-gray-500 ml-2">(Fixed benchmark - set at inception)</span>
+                </label>
+                <input
+                  type="number"
+                  step="0.0001"
+                  value={formData.budgetedForwardRate}
+                  onChange={(e) => setFormData({ ...formData, budgetedForwardRate: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Leave empty to auto-calculate using IRP"
+                  disabled={!!editingContract} // Disable for editing - budgeted rate is FIXED
+                />
+                {editingContract && (
+                  <p className="text-xs text-gray-600 mt-1">
+                    ⚠️ Budgeted Forward Rate cannot be changed after contract inception (remains fixed throughout contract lifecycle)
+                  </p>
+                )}
+                {!editingContract && (
+                  <p className="text-xs text-gray-600 mt-1">
+                    💡 Leave empty to auto-calculate using Interest Rate Parity (IRP), or enter manual rate for institutional pricing
+                  </p>
+                )}
               </div>
             </div>
             <div className="flex space-x-3">
@@ -316,6 +553,7 @@ export default function ContractManagement() {
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Budgeted Rate
+                    <div className="text-xs normal-case text-gray-400 font-normal">(Fixed at inception)</div>
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Current Rate
@@ -332,7 +570,7 @@ export default function ContractManagement() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {state.contracts.map((contract) => (
+                {state.contracts.map((contract: any) => (
                   <tr key={contract.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div>
