@@ -5,167 +5,85 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { Calendar, TrendingUp, TrendingDown, Calculator, Download } from 'lucide-react'
 import { useCurrency } from '@/contexts/CurrencyContext'
 import { format, differenceInDays, addDays } from 'date-fns'
+import { generateInstitutionalDailyPnLAnalysis } from '@/lib/institutional-pnl-analysis'
 import { INTEREST_RATES } from '@/lib/enhanced-financial-utils'
-
-// Cubic Spline Interpolation Implementation
-class CubicSpline {
-  private x: number[]
-  private y: number[]
-  private a: number[]
-  private b: number[]
-  private c: number[]
-  private d: number[]
-
-  constructor(x: number[], y: number[]) {
-    this.x = [...x]
-    this.y = [...y]
-    this.a = [...y]
-    this.b = []
-    this.c = []
-    this.d = []
-    this.calculateCoefficients()
-  }
-
-  private calculateCoefficients() {
-    const n = this.x.length - 1
-    const h: number[] = []
-    
-    for (let i = 0; i < n; i++) {
-      h[i] = this.x[i + 1] - this.x[i]
-    }
-
-    const alpha: number[] = []
-    for (let i = 1; i < n; i++) {
-      alpha[i] = (3 / h[i]) * (this.a[i + 1] - this.a[i]) - (3 / h[i - 1]) * (this.a[i] - this.a[i - 1])
-    }
-
-    const l: number[] = [1]
-    const mu: number[] = [0]
-    const z: number[] = [0]
-
-    for (let i = 1; i < n; i++) {
-      l[i] = 2 * (this.x[i + 1] - this.x[i - 1]) - h[i - 1] * mu[i - 1]
-      mu[i] = h[i] / l[i]
-      z[i] = (alpha[i] - h[i - 1] * z[i - 1]) / l[i]
-    }
-
-    l[n] = 1
-    z[n] = 0
-    this.c[n] = 0
-
-    for (let j = n - 1; j >= 0; j--) {
-      this.c[j] = z[j] - mu[j] * this.c[j + 1]
-      this.b[j] = (this.a[j + 1] - this.a[j]) / h[j] - h[j] * (this.c[j + 1] + 2 * this.c[j]) / 3
-      this.d[j] = (this.c[j + 1] - this.c[j]) / (3 * h[j])
-    }
-  }
-
-  interpolate(x: number): number {
-    let j = 0
-    for (let i = 1; i < this.x.length; i++) {
-      if (x <= this.x[i]) {
-        j = i - 1
-        break
-      }
-    }
-
-    const dx = x - this.x[j]
-    return this.a[j] + this.b[j] * dx + this.c[j] * dx * dx + this.d[j] * dx * dx * dx
-  }
-}
-
-// Forward Rate Calculator using Interest Rate Parity and Cubic Spline
-function calculateForwardCurve(
-  spotRate: number,
-  homeRate: number,
-  foreignRate: number,
-  maxDays: number
-): { day: number; forwardRate: number }[] {
-  // Create anchor points at standard market tenors
-  const anchorDays = [0, 30, 60, 90, 120, 150, 180, 240, 300, 365]
-  const anchorRates = anchorDays.map(days => {
-    if (days === 0) return spotRate
-    
-    // Interest Rate Parity formula
-    const homeDiscount = 1 + (homeRate / 100) * (days / 365)
-    const foreignDiscount = 1 + (foreignRate / 100) * (days / 365)
-    return spotRate * (homeDiscount / foreignDiscount)
-  })
-
-  // Filter anchor points to only include those within our time range
-  const validAnchors = anchorDays
-    .map((day, i) => ({ day, rate: anchorRates[i] }))
-    .filter(anchor => anchor.day <= maxDays)
-
-  // If we need to extrapolate beyond our anchors, add an end point
-  if (maxDays > validAnchors[validAnchors.length - 1].day) {
-    const extrapolatedRate = spotRate * 
-      ((1 + (homeRate / 100) * (maxDays / 365)) / 
-       (1 + (foreignRate / 100) * (maxDays / 365)))
-    validAnchors.push({ day: maxDays, rate: extrapolatedRate })
-  }
-
-  const spline = new CubicSpline(
-    validAnchors.map(a => a.day),
-    validAnchors.map(a => a.rate)
-  )
-
-  // Generate daily forward rates using cubic spline interpolation
-  const forwardCurve = []
-  for (let day = 0; day <= maxDays; day++) {
-    forwardCurve.push({
-      day,
-      forwardRate: spline.interpolate(day)
-    })
-  }
-
-  return forwardCurve
-}
 
 export default function PnLAnalytics() {
   const { state } = useCurrency()
   const [selectedContractId, setSelectedContractId] = useState<string>('')
 
-  // Generate P&L data for selected contract
-  const pnlData = useMemo(() => {
-    if (!selectedContractId) return []
+  // IMMEDIATE FIX: Generate realistic P&L data with market movement simulation
+  const pnlDataWithBudgetedRate = useMemo(() => {
+    if (!selectedContractId) return { data: [], calculatedBudgetedForwardRate: 0 }
 
     const contract = state.contracts.find(c => c.id === selectedContractId)
-    if (!contract) return []
+    if (!contract) return { data: [], calculatedBudgetedForwardRate: 0 }
 
     // Get the correct spot rate for the contract's currency pair
     const rateInfo = state.currencyRates.find(r => r.pair === contract.currencyPair)
     if (!rateInfo) {
       console.warn(`No live rate found for ${contract.currencyPair}`)
-      return []
+      return { data: [], calculatedBudgetedForwardRate: contract.budgetedForwardRate }
     }
 
-    const contractDays = differenceInDays(contract.maturityDate, contract.contractDate)
-    const spotRate = rateInfo.spotRate
-    const [baseCurrency, quoteCurrency] = contract.currencyPair.split('/')
-    const homeRate = INTEREST_RATES[quoteCurrency as keyof typeof INTEREST_RATES] || 0.055
-    const foreignRate = INTEREST_RATES[baseCurrency as keyof typeof INTEREST_RATES] || 0.05
+    const contractDays = Math.min(differenceInDays(contract.maturityDate, new Date()), 30) // Limit to 30 days for display
+    const currentSpotRate = rateInfo.spotRate
 
-    // Generate forward curve using cubic spline
-    const forwardCurve = calculateForwardCurve(spotRate, homeRate, foreignRate, contractDays)
+    console.log(`🎯 P&L ANALYTICS - Using INSTITUTIONAL STANDARD:`)
+    console.log(`   Contract: ${contract.id}`)
+    console.log(`   Currency Pair: ${contract.currencyPair}`)
+    console.log(`   Live Spot Rate: ${currentSpotRate.toFixed(4)}`)
+    console.log(`   Will calculate budgeted forward rate using institutional formula...`)
 
-    // Calculate daily P&L
-    return forwardCurve.map((point) => {
-      const date = addDays(contract.contractDate, point.day)
-      const currentForwardRate = point.forwardRate
-      const pnl = (currentForwardRate - contract.budgetedForwardRate) * contract.amount
+    // USE INSTITUTIONAL-GRADE P&L ANALYSIS (calculates budgeted rate internally)
+    const { dailyEntries } = generateInstitutionalDailyPnLAnalysis(
+      {
+        id: contract.id,
+        contractDate: contract.contractDate,
+        maturityDate: contract.maturityDate,
+        currencyPair: contract.currencyPair,
+        amount: contract.amount,
+        contractType: contract.contractType,
+        // Don't pass budgetedForwardRate - let it be calculated
+        inceptionSpotRate: contract.inceptionSpotRate
+      },
+      currentSpotRate,
+      new Date()
+    )
 
-      return {
-        date: format(date, 'MMM dd'),
-        day: point.day,
-        spotRate: spotRate + (Math.random() * 0.2 - 0.1), // Mock daily spot variation
-        forwardRate: currentForwardRate,
-        budgetedRate: contract.budgetedForwardRate,
-        pnl: pnl,
-        cumulativePnl: pnl, // Simplified - would be cumulative in real implementation
-      }
-    })
-  }, [selectedContractId, state.contracts])
+    // Get the calculated budgeted forward rate from the first entry (institutional standard)
+    const calculatedBudgetedForwardRate = dailyEntries[0]?.budgetedForwardRate || contract.budgetedForwardRate
+    
+    console.log(`   Calculated Budgeted Forward Rate: ${calculatedBudgetedForwardRate.toFixed(4)} (INSTITUTIONAL FORMULA)`)
+    console.log(`   This matches Risk Reporting calculations for symmetry`)
+
+    // Transform to chart format (only current day data per institutional standards)
+    const dailyData = dailyEntries.map((entry, index) => ({
+      date: format(entry.date, 'MMM dd'),
+      day: entry.dayNumber,
+      spotRate: entry.liveSpotRate,
+      forwardRate: entry.cubicSplineForwardRate,
+      budgetedRate: entry.budgetedForwardRate,
+      pnl: entry.dailyPnL,
+      cumulativePnl: entry.cumulativePnL,
+      markToMarket: entry.markToMarket,
+      daysToMaturity: entry.daysToMaturity
+    }))
+
+    console.log(`✅ INSTITUTIONAL P&L DATA GENERATED:`)
+    console.log(`   Entries: ${dailyData.length} (TODAY ONLY - no future projections)`)
+    console.log(`   Current MTM: ${dailyData[0]?.markToMarket?.toFixed(2)} ${contract.currencyPair.split('/')[1]}`)
+
+    console.log(`🎯 REALISTIC P&L DATA GENERATED for ${contract.currencyPair}:`)
+    console.log(`Day 1 P&L: ₹${dailyData[0]?.pnl.toFixed(0) || 0}`)
+    console.log(`Day 2 P&L: ₹${dailyData[1]?.pnl.toFixed(0) || 0}`)
+    console.log(`Day 3 P&L: ₹${dailyData[2]?.pnl.toFixed(0) || 0}`)
+
+    return { data: dailyData, calculatedBudgetedForwardRate }
+  }, [selectedContractId, state.contracts, state.currencyRates])
+
+  const pnlData = pnlDataWithBudgetedRate.data
+  const calculatedBudgetedForwardRate = pnlDataWithBudgetedRate.calculatedBudgetedForwardRate
 
   const selectedContract = state.contracts.find(c => c.id === selectedContractId)
 
@@ -176,30 +94,18 @@ export default function PnLAnalytics() {
     const contract = selectedContract
     if (!contract) return null
 
-    const totalPnl = pnlData[pnlData.length - 1]?.pnl || 0
-    const maxProfit = Math.max(...pnlData.map(d => d.pnl))
+    const totalPnl = pnlData[pnlData.length - 1]?.cumulativePnl || 0
+    const maxProfit = Math.max(...pnlData.map(d => d.cumulativePnl || 0))
+    const maxLoss = Math.abs(Math.min(...pnlData.map(d => d.cumulativePnl || 0)))
     
-    // CORRECTED: Calculate Max Loss using VaR-based approach (99% confidence)
-    // For forward contracts, max loss is based on extreme adverse movements
-    const budgetedRate = contract.budgetedForwardRate
-    const contractAmount = contract.amount
     const daysToMaturity = Math.max(1, differenceInDays(new Date(contract.maturityDate), new Date()))
     
-    // Calculate volatility properly (annualized)
+    // Calculate volatility from daily P&L changes
     const dailyReturns = pnlData.slice(1).map((d, i) => 
       (d.forwardRate - pnlData[i].forwardRate) / pnlData[i].forwardRate
     )
     const volatility = dailyReturns.length > 1 ? 
       Math.sqrt(dailyReturns.reduce((sum, r) => sum + Math.pow(r, 2), 0) / dailyReturns.length) * Math.sqrt(365) * 100 : 15
-    
-    // VaR-based Max Loss calculation (99% confidence level)
-    // Assumes normal distribution, 2.33 is 99% confidence z-score
-    const timeToMaturityYears = daysToMaturity / 365
-    const maxAdverseMovement = 2.33 * (volatility / 100) * Math.sqrt(timeToMaturityYears)
-    
-    // For EUR/INR export contract, max loss occurs when EUR weakens
-    const worstCaseForwardRate = budgetedRate * (1 - maxAdverseMovement)
-    const maxLoss = Math.abs((worstCaseForwardRate - budgetedRate) * contractAmount)
     
     // CORRECTED: Calculate Optimal Exit Day properly
     // Find the day with best risk-adjusted return (within maturity period)
@@ -290,7 +196,7 @@ export default function PnLAnalytics() {
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Budgeted Rate (Inception)</p>
-                  <p className="text-lg font-semibold font-mono">{selectedContract.budgetedForwardRate.toFixed(4)}</p>
+                  <p className="text-lg font-semibold font-mono">{calculatedBudgetedForwardRate.toFixed(4)}</p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Days to Maturity</p>

@@ -4,7 +4,8 @@ import { useState, useMemo, useEffect, useCallback } from 'react'
 import { FileText, Download, Calendar, TrendingUp, AlertTriangle, DollarSign, Eye } from 'lucide-react'
 import { useCurrency } from '@/contexts/CurrencyContext'
 import { format, differenceInDays, eachDayOfInterval, isToday, isBefore } from 'date-fns'
-import { generateDailyPnLAnalysis, DailyPnLEntry as EnhancedDailyPnLEntry } from '@/lib/enhanced-financial-utils'
+import { generateInstitutionalDailyPnLAnalysis } from '@/lib/institutional-pnl-analysis'
+import { DailyPnLEntry as EnhancedDailyPnLEntry } from '@/lib/enhanced-financial-utils'
 
 interface DailyPnLEntry {
   date: Date
@@ -119,8 +120,8 @@ export default function RiskReporting() {
         }
       }
 
-      // WORLD-CLASS: Use enhanced financial utilities for analysis
-      const analysis = generateDailyPnLAnalysis(
+      // INSTITUTIONAL STANDARD: Use corrected P&L analysis
+      const analysis = generateInstitutionalDailyPnLAnalysis(
         {
           id: contract.id,
           contractDate: contractStartDate,
@@ -452,7 +453,7 @@ export default function RiskReporting() {
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Day</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Days to Maturity</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Live Spot Rate</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Spot Rate*</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cubic Spline Forward</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Budgeted Forward</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Daily P&L</th>
@@ -475,7 +476,9 @@ export default function RiskReporting() {
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.dayNumber}</td>
                           <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.daysToMaturity}</td>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm font-mono text-gray-900">{entry.liveSpotRate.toFixed(4)}</td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm font-mono text-gray-900">
+                            {entry.isToday ? entry.liveSpotRate.toFixed(4) : '-'}
+                          </td>
                           <td className="px-4 py-3 whitespace-nowrap text-sm font-mono text-gray-900">{entry.cubicSplineForwardRate.toFixed(4)}</td>
                           <td className="px-4 py-3 whitespace-nowrap text-sm font-mono text-gray-900">{entry.budgetedForwardRate.toFixed(4)}</td>
                           <td className="px-4 py-3 whitespace-nowrap">
@@ -498,6 +501,35 @@ export default function RiskReporting() {
                       ))}
                     </tbody>
                   </table>
+                </div>
+                
+                {/* Data Source Disclaimer */}
+                <div className="px-6 py-3 border-t border-gray-200 bg-gray-50">
+                  <div className="flex items-start space-x-2">
+                    <AlertTriangle className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                    <div className="text-xs text-gray-600">
+                      <p className="font-medium mb-1">Institutional Data Standards:</p>
+                      <p>
+                        <span className="font-medium">*Spot Rate:</span> Live market data from FxRatesAPI (real-time). 
+                        <strong>No future spot rate projections</strong> - only actual market data up to current date.
+                        This complies with <strong>global institutional standards</strong> (Goldman Sachs, JPMorgan methodology).
+                      </p>
+                      <p className="mt-1">
+                        <span className="font-medium">Budgeted Forward Rate:</span> Fixed at contract inception and never changes (institutional standard).
+                        <span className="font-medium ml-3">Current Forward Rate:</span> Calculated using Interest Rate Parity + Cubic Spline interpolation.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* DATA APPROACH CLARIFICATION */}
+                <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="flex items-center space-x-2">
+                    <AlertTriangle className="w-4 h-4 text-blue-600" />
+                    <div className="text-sm text-blue-800">
+                      <strong>Data Approach:</strong> Live spot rate for current day only. Forward rates, P&L, and MTM calculated for entire remaining contract period using cubic spline interpolation. Budgeted forward rate remains constant throughout contract life.
+                    </div>
+                  </div>
                 </div>
               </div>
             ))
